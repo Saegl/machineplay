@@ -1,1 +1,7 @@
 @import "tailwindcss";
+
+.cg-wrap {
+  width: 480px;
+  height: 480px;
+  position: relative;
+}
