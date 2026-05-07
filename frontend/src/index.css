@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 .cg-wrap {
-  width: 480px;
-  height: 480px;
+  width: min(92vw, 92vh, 480px);
+  aspect-ratio: 1;
   position: relative;
 }

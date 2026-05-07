@@ -45,8 +45,8 @@ function App() {
   }, [])
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-6 bg-neutral-950 text-neutral-100">
-      <h1 className="text-3xl font-semibold">machineplay</h1>
+    <main className="min-h-dvh flex flex-col items-center justify-center gap-4 sm:gap-6 px-4 py-6 bg-neutral-950 text-neutral-100">
+      <h1 className="text-2xl sm:text-3xl font-semibold">machineplay</h1>
 
       <Chessground
         config={{ viewOnly: true, coordinates: true }}
