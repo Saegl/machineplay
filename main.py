@@ -136,16 +136,6 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-def main():
-    return "Hello from machineplay!"
-
-
-@app.get("/new")
-def new():
-    return "New api is here"
-
-
 @app.websocket("/ws/stream")
 async def ws_stream(ws: WebSocket):
     await ws.accept()
