@@ -3,21 +3,39 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from uuid import UUID, uuid4
 
 import chess
 import chess.engine
-from fastapi import FastAPI, Request
+from beanie import Document, init_beanie
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from pymongo import AsyncMongoClient
 
 log = logging.getLogger("machineplay")
 
 TC = os.environ.get("MACHINEPLAY_TC", "30+0.3")
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
+MONGO_DB = os.environ.get("MONGO_DB", "machineplay")
 
 
 def parse_tc(spec: str) -> tuple[float, float]:
     base, _, inc = spec.partition("+")
     return float(base), float(inc) if inc else 0.0
+
+
+class Engine(Document):
+    id: UUID = Field(default_factory=uuid4)
+    name: str
+    command: str
+    description: str = ""
+
+
+class StartGameRequest(BaseModel):
+    white_engine_id: UUID
+    black_engine_id: UUID
 
 
 class GameStream:
@@ -49,15 +67,16 @@ class GameStream:
             except asyncio.QueueFull:
                 pass
 
-    async def run_forever(self) -> None:
-        while True:
+    async def start_game(self, white_cmd: str, black_cmd: str) -> None:
+        if self._task and not self._task.done():
+            self._task.cancel()
             try:
-                await self._play_one_game()
-            except Exception:
-                log.exception("game loop error; restarting in 2s")
-                await asyncio.sleep(2)
+                await self._task
+            except (asyncio.CancelledError, Exception):
+                pass
+        self._task = asyncio.create_task(self._play_one_game(white_cmd, black_cmd))
 
-    async def _play_one_game(self) -> None:
+    async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
         self._broadcast({"type": "game_start"})
         self._broadcast(self.snapshot())
@@ -65,8 +84,8 @@ class GameStream:
         base, inc = parse_tc(TC)
         clocks = {chess.WHITE: base, chess.BLACK: base}
 
-        _, white = await chess.engine.popen_uci("stockfish")
-        _, black = await chess.engine.popen_uci("stockfish")
+        _, white = await chess.engine.popen_uci(white_cmd)
+        _, black = await chess.engine.popen_uci(black_cmd)
         engines = {chess.WHITE: white, chess.BLACK: black}
 
         try:
@@ -113,12 +132,14 @@ stream = GameStream()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    stream._task = asyncio.create_task(stream.run_forever())
+    client = AsyncMongoClient(MONGO_URL)
+    await init_beanie(database=client[MONGO_DB], document_models=[Engine])
     try:
         yield
     finally:
-        if stream._task:
+        if stream._task and not stream._task.done():
             stream._task.cancel()
+        await client.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -133,6 +154,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/engine", response_model_by_alias=False)
+async def list_engines() -> list[Engine]:
+    return await Engine.find_all().to_list()
+
+
+@app.post("/game")
+async def start_game(payload: StartGameRequest) -> dict:
+    white = await Engine.get(payload.white_engine_id)
+    black = await Engine.get(payload.black_engine_id)
+    if white is None or black is None:
+        raise HTTPException(status_code=404, detail="engine not found")
+    await stream.start_game(white.command, black.command)
+    return {"status": "started", "white": str(white.id), "black": str(black.id)}
 
 
 @app.get("/sse/stream")
