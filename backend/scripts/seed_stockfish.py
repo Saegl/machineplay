@@ -7,7 +7,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from beanie import init_beanie
 from pymongo import AsyncMongoClient
 
-from main import MONGO_DB, MONGO_URL, Engine
+from config import MONGO_DB, MONGO_URL
+from models import Engine
 
 
 async def main() -> None:

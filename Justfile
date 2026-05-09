@@ -1,5 +1,5 @@
 run-backend:
-    cd backend && python main.py
+    cd backend && uvicorn app:app --reload
 
 run-frontend:
     cd frontend && pnpm dev

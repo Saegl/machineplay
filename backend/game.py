@@ -1,41 +1,9 @@
 import asyncio
-import json
-import logging
-import os
-from contextlib import asynccontextmanager
-from uuid import UUID, uuid4
 
 import chess
 import chess.engine
-from beanie import Document, init_beanie
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from pymongo import AsyncMongoClient
 
-log = logging.getLogger("machineplay")
-
-TC = os.environ.get("MACHINEPLAY_TC", "30+0.3")
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-MONGO_DB = os.environ.get("MONGO_DB", "machineplay")
-
-
-def parse_tc(spec: str) -> tuple[float, float]:
-    base, _, inc = spec.partition("+")
-    return float(base), float(inc) if inc else 0.0
-
-
-class Engine(Document):
-    id: UUID = Field(default_factory=uuid4)
-    name: str
-    command: str
-    description: str = ""
-
-
-class StartGameRequest(BaseModel):
-    white_engine_id: UUID
-    black_engine_id: UUID
+from config import TC, parse_tc
 
 
 class GameStream:
@@ -128,74 +96,3 @@ class GameStream:
 
 
 stream = GameStream()
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    client = AsyncMongoClient(MONGO_URL)
-    await init_beanie(database=client[MONGO_DB], document_models=[Engine])
-    try:
-        yield
-    finally:
-        if stream._task and not stream._task.done():
-            stream._task.cancel()
-        await client.close()
-
-
-app = FastAPI(lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://machineplay.saegl.me",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/engine", response_model_by_alias=False)
-async def list_engines() -> list[Engine]:
-    return await Engine.find_all().to_list()
-
-
-@app.post("/game")
-async def start_game(payload: StartGameRequest) -> dict:
-    white = await Engine.get(payload.white_engine_id)
-    black = await Engine.get(payload.black_engine_id)
-    if white is None or black is None:
-        raise HTTPException(status_code=404, detail="engine not found")
-    await stream.start_game(white.command, black.command)
-    return {"status": "started", "white": str(white.id), "black": str(black.id)}
-
-
-@app.get("/sse/stream")
-async def sse_stream(request: Request):
-    async def event_source():
-        q = stream.subscribe()
-        try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=15.0)
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-                    continue
-                yield f"data: {json.dumps(event)}\n\n"
-        finally:
-            stream.unsubscribe(q)
-
-    return StreamingResponse(
-        event_source(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run("main:app", reload=True)
