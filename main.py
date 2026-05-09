@@ -163,4 +163,4 @@ async def ws_stream(ws: WebSocket):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("main:app")
+    uvicorn.run("main:app", reload=True)
