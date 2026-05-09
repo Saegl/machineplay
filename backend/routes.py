@@ -5,7 +5,8 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from game import stream
-from models import Engine, StartGameRequest
+from models import Engine
+from schemas import StartGameRequest
 
 
 router = APIRouter()
