@@ -3,7 +3,7 @@ import type { Api } from '@lichess-org/chessground/api'
 import { Chessground } from './Chessground'
 
 const API_URL = import.meta.env.VITE_API_URL
-const WS_URL = API_URL.replace(/^http/, 'ws') + '/ws/stream'
+const SSE_URL = API_URL + '/sse/stream'
 
 type StreamEvent =
   | { type: 'fen'; fen: string; ply: number }
@@ -18,11 +18,10 @@ function App() {
   const [result, setResult] = useState<string | null>(null)
 
   useEffect(() => {
-    const ws = new WebSocket(WS_URL)
-    ws.onopen = () => setStatus('connected')
-    ws.onclose = () => setStatus('disconnected')
-    ws.onerror = () => setStatus('error')
-    ws.onmessage = (e) => {
+    const es = new EventSource(SSE_URL)
+    es.onopen = () => setStatus('connected')
+    es.onerror = () => setStatus(es.readyState === EventSource.CLOSED ? 'disconnected' : 'error')
+    es.onmessage = (e) => {
       const event: StreamEvent = JSON.parse(e.data)
       const api = apiRef.current
       if (!api) return
@@ -41,7 +40,7 @@ function App() {
         setResult(event.result)
       }
     }
-    return () => ws.close()
+    return () => es.close()
   }, [])
 
   return (

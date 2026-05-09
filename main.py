@@ -1,12 +1,14 @@
 import asyncio
+import json
 import logging
 import os
 import re
 from contextlib import asynccontextmanager
 
 import chess
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 log = logging.getLogger("machineplay")
 
@@ -136,18 +138,28 @@ app.add_middleware(
 )
 
 
-@app.websocket("/ws/stream")
-async def ws_stream(ws: WebSocket):
-    await ws.accept()
-    q = stream.subscribe()
-    try:
-        while True:
-            event = await q.get()
-            await ws.send_json(event)
-    except WebSocketDisconnect:
-        pass
-    finally:
-        stream.unsubscribe(q)
+@app.get("/sse/stream")
+async def sse_stream(request: Request):
+    async def event_source():
+        q = stream.subscribe()
+        try:
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(q.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            stream.unsubscribe(q)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 if __name__ == "__main__":
