@@ -59,10 +59,20 @@ class GameStream:
 
         proc = await asyncio.create_subprocess_exec(
             "cutechess-cli",
-            "-engine", "name=stockfish1", "cmd=stockfish", "proto=uci",
-            "-engine", "name=stockfish2", "cmd=stockfish", "proto=uci",
-            "-each", f"tc={CUTECHESS_TC}",
-            "-games", "1", "-rounds", "1",
+            "-engine",
+            "name=stockfish1",
+            "cmd=stockfish",
+            "proto=uci",
+            "-engine",
+            "name=stockfish2",
+            "cmd=stockfish",
+            "proto=uci",
+            "-each",
+            f"tc={CUTECHESS_TC}",
+            "-games",
+            "1",
+            "-rounds",
+            "1",
             "-debug",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
@@ -84,14 +94,16 @@ class GameStream:
             if move not in self.board.legal_moves:
                 continue
             self.board.push(move)
-            self._broadcast({
-                "type": "move",
-                "uci": uci,
-                "from": uci[:2],
-                "to": uci[2:4],
-                "fen": self.board.fen(),
-                "ply": self.board.ply(),
-            })
+            self._broadcast(
+                {
+                    "type": "move",
+                    "uci": uci,
+                    "from": uci[:2],
+                    "to": uci[2:4],
+                    "fen": self.board.fen(),
+                    "ply": self.board.ply(),
+                }
+            )
 
         await proc.wait()
         self._broadcast({"type": "game_end", "result": self.board.result()})
