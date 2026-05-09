@@ -2,19 +2,22 @@ import asyncio
 import json
 import logging
 import os
-import re
 from contextlib import asynccontextmanager
 
 import chess
+import chess.engine
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 log = logging.getLogger("machineplay")
 
-BESTMOVE_RE = re.compile(r"\bbestmove\s+(\S+)")
+TC = os.environ.get("MACHINEPLAY_TC", "30+0.3")
 
-CUTECHESS_TC = os.environ.get("MACHINEPLAY_TC", "30+0.3")
+
+def parse_tc(spec: str) -> tuple[float, float]:
+    base, _, inc = spec.partition("+")
+    return float(base), float(inc) if inc else 0.0
 
 
 class GameStream:
@@ -59,56 +62,50 @@ class GameStream:
         self._broadcast({"type": "game_start"})
         self._broadcast(self.snapshot())
 
-        proc = await asyncio.create_subprocess_exec(
-            "cutechess-cli",
-            "-engine",
-            "name=stockfish1",
-            "cmd=stockfish",
-            "proto=uci",
-            "-engine",
-            "name=stockfish2",
-            "cmd=stockfish",
-            "proto=uci",
-            "-each",
-            f"tc={CUTECHESS_TC}",
-            "-games",
-            "1",
-            "-rounds",
-            "1",
-            "-debug",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+        base, inc = parse_tc(TC)
+        clocks = {chess.WHITE: base, chess.BLACK: base}
+
+        _, white = await chess.engine.popen_uci("stockfish")
+        _, black = await chess.engine.popen_uci("stockfish")
+        engines = {chess.WHITE: white, chess.BLACK: black}
+
+        try:
+            while not self.board.is_game_over(claim_draw=True):
+                side = self.board.turn
+                limit = chess.engine.Limit(
+                    white_clock=clocks[chess.WHITE],
+                    black_clock=clocks[chess.BLACK],
+                    white_inc=inc,
+                    black_inc=inc,
+                )
+                loop = asyncio.get_running_loop()
+                t0 = loop.time()
+                result = await engines[side].play(self.board, limit)
+                elapsed = loop.time() - t0
+                clocks[side] = max(0.0, clocks[side] - elapsed + inc)
+
+                move = result.move
+                if move is None or move not in self.board.legal_moves:
+                    break
+                uci = move.uci()
+                self.board.push(move)
+                self._broadcast(
+                    {
+                        "type": "move",
+                        "uci": uci,
+                        "from": uci[:2],
+                        "to": uci[2:4],
+                        "fen": self.board.fen(),
+                        "ply": self.board.ply(),
+                    }
+                )
+        finally:
+            await white.quit()
+            await black.quit()
+
+        self._broadcast(
+            {"type": "game_end", "result": self.board.result(claim_draw=True)}
         )
-        assert proc.stdout is not None
-
-        async for raw in proc.stdout:
-            line = raw.decode("utf-8", errors="replace").rstrip()
-            m = BESTMOVE_RE.search(line)
-            if not m:
-                continue
-            uci = m.group(1)
-            if uci == "(none)":
-                continue
-            try:
-                move = chess.Move.from_uci(uci)
-            except ValueError:
-                continue
-            if move not in self.board.legal_moves:
-                continue
-            self.board.push(move)
-            self._broadcast(
-                {
-                    "type": "move",
-                    "uci": uci,
-                    "from": uci[:2],
-                    "to": uci[2:4],
-                    "fen": self.board.fen(),
-                    "ply": self.board.ply(),
-                }
-            )
-
-        await proc.wait()
-        self._broadcast({"type": "game_end", "result": self.board.result()})
 
 
 stream = GameStream()
