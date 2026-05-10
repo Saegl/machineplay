@@ -49,7 +49,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://machineplay.saegl.me",
+        "https://machineplay.org",
     ],
     allow_credentials=True,
     allow_methods=["*"],

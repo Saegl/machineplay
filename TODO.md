@@ -13,13 +13,12 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Update local git remote (`git remote set-url origin …`)
 - [x] Point `machineplay.org` DNS to the VPS (A/AAAA records)
 - [x] Point `api.machineplay.org` DNS to the VPS
-- [ ] Swap nginx vhosts to the new domains
-- [ ] Issue Let's Encrypt certs for `machineplay.org` + `api.machineplay.org`
-- [ ] Update frontend `.env.production` `VITE_API_URL` to `https://api.machineplay.org`
-- [ ] Update backend CORS `allow_origins` to `https://machineplay.org`
-- [ ] Update GitHub OAuth callback URL once M5 lands (placeholder for now)
-- [ ] Tear down `*.saegl.me` nginx vhosts and DNS
-- [ ] Update README, deploy scripts, and any hardcoded URLs in code/docs
+- [x] Swap nginx vhosts to the new domains
+- [x] Issue Let's Encrypt certs for `machineplay.org` + `api.machineplay.org`
+- [x] Update frontend `.env.production` `VITE_API_URL` to `https://api.machineplay.org`
+- [x] Update backend CORS `allow_origins` to `https://machineplay.org`
+- [x] Tear down `*.saegl.me` nginx vhosts and DNS
+- [x] Update README, deploy scripts, and any hardcoded URLs in code/docs
 - [ ] Decide license (MIT/Apache-2.0) and add `LICENSE`
 
 ## M1 — Frontend polish (warm-up wins)
