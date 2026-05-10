@@ -10,7 +10,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Register `machineplay.org`
 - [x] Create GitHub organization (e.g. `machineplay`)
 - [x] Transfer this repo from personal account to the org
-- [ ] Update local git remote (`git remote set-url origin …`)
+- [x] Update local git remote (`git remote set-url origin …`)
 - [x] Point `machineplay.org` DNS to the VPS (A/AAAA records)
 - [x] Point `api.machineplay.org` DNS to the VPS
 - [ ] Swap nginx vhosts to the new domains
