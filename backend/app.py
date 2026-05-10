@@ -24,7 +24,6 @@ async def lifespan(app: FastAPI):
     # This is the only way I found to react to uvicorn shutdown/reload events when SSE is active
     # otherwise uvicorn waits indefinitely or timeouts with `--timeout-graceful-shutdown 5`
     loop.add_signal_handler(signal.SIGINT, on_shutdown_request, signal.SIGINT.name)
-    loop.add_signal_handler(signal.SIGTERM, on_shutdown_request, signal.SIGTERM.name)
 
     client = await db.connect()
 
