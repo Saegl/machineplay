@@ -1,5 +1,3 @@
-import signal
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -18,21 +16,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def on_shutdown_request(name: str):
-    logger.info("shutdown requested, received %s", name)
-
-    for q in stream.subscribers:
-        q.shutdown()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    loop = asyncio.get_running_loop()
-
-    # This is the only way I found to react to uvicorn shutdown/reload events when SSE is active
-    # otherwise uvicorn waits indefinitely or timeouts with `--timeout-graceful-shutdown 5`
-    loop.add_signal_handler(signal.SIGINT, on_shutdown_request, signal.SIGINT.name)
-
     client = await db.connect()
 
     try:
@@ -41,6 +26,11 @@ async def lifespan(app: FastAPI):
         if stream._task and not stream._task.done():
             stream._task.cancel()
         await client.close()
+
+        for q in stream.subscribers:
+            q.shutdown()
+
+        stream.subscribers.clear()
 
 
 app = FastAPI(lifespan=lifespan)
