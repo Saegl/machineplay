@@ -1,5 +1,6 @@
 import signal
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,8 +11,15 @@ from game import stream
 from routes import router
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
 def on_shutdown_request(name: str):
-    print(f"Shutdown requested, received {name}")
+    logger.info("shutdown requested, received %s", name)
 
     for q in stream.subscribers:
         q.shutdown()

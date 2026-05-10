@@ -1,9 +1,13 @@
 import asyncio
+import logging
 
 import chess
 import chess.engine
 
 from config import TC, parse_tc
+
+
+logger = logging.getLogger(__name__)
 
 
 class GameStream:
@@ -23,25 +27,31 @@ class GameStream:
         q: asyncio.Queue[dict] = asyncio.Queue(maxsize=256)
         q.put_nowait(self.snapshot())
         self.subscribers.add(q)
+        logger.info("subscriber added, total=%d", len(self.subscribers))
         return q
 
     def unsubscribe(self, q: asyncio.Queue[dict]) -> None:
         self.subscribers.discard(q)
+        logger.info("subscriber removed, total=%d", len(self.subscribers))
 
     def _broadcast(self, event: dict) -> None:
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
             except asyncio.QueueFull:
-                pass
+                logger.warning(
+                    "subscriber queue full, dropping event type=%s", event.get("type")
+                )
 
     async def start_game(self, white_cmd: str, black_cmd: str) -> None:
         if self._task and not self._task.done():
+            logger.info("cancelling in-progress game before starting a new one")
             self._task.cancel()
             try:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
+        logger.info("starting game: white=%r black=%r tc=%s", white_cmd, black_cmd, TC)
         self._task = asyncio.create_task(self._play_one_game(white_cmd, black_cmd))
 
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
@@ -73,6 +83,9 @@ class GameStream:
 
                 move = result.move
                 if move is None or move not in self.board.legal_moves:
+                    logger.warning(
+                        "illegal or null move from engine, ending game (move=%r)", move
+                    )
                     break
                 uci = move.uci()
                 self.board.push(move)
@@ -90,9 +103,9 @@ class GameStream:
             await white.quit()
             await black.quit()
 
-        self._broadcast(
-            {"type": "game_end", "result": self.board.result(claim_draw=True)}
-        )
+        result_str = self.board.result(claim_draw=True)
+        logger.info("game ended result=%s plies=%d", result_str, self.board.ply())
+        self._broadcast({"type": "game_end", "result": result_str})
 
 
 stream = GameStream()

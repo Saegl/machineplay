@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import AsyncIterable
 
 from fastapi import APIRouter, HTTPException
@@ -9,6 +10,7 @@ from models import Engine
 from schemas import StartGameRequest
 
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -35,6 +37,6 @@ async def sse_stream() -> AsyncIterable[dict]:
             event = await q.get()
             yield event
     except asyncio.QueueShutDown:
-        print("stream ended, queue shutdown")
+        logger.info("stream ended, queue shutdown")
     finally:
         stream.unsubscribe(q)
