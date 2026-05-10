@@ -19,7 +19,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Update backend CORS `allow_origins` to `https://machineplay.org`
 - [x] Tear down `*.saegl.me` nginx vhosts and DNS
 - [x] Update README, deploy scripts, and any hardcoded URLs in code/docs
-- [ ] Decide license (MIT/Apache-2.0) and add `LICENSE`
+- [x] Decide license (MIT/Apache-2.0) and add `LICENSE`
 
 ## M1 — Frontend polish (warm-up wins)
 - [ ] Show engine names above the board during a game (white / black labels)
