@@ -1,8 +1,8 @@
 import asyncio
-import json
+from typing import AsyncIterable
 
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException
+from fastapi.sse import EventSourceResponse
 
 from game import stream
 from models import Engine
@@ -27,25 +27,14 @@ async def start_game(payload: StartGameRequest) -> dict:
     return {"status": "started", "white": str(white.id), "black": str(black.id)}
 
 
-@router.get("/sse/stream")
-async def sse_stream(request: Request):
-    async def event_source():
-        q = stream.subscribe()
-        try:
-            while True:
-                if await request.is_disconnected():
-                    break
-                try:
-                    event = await asyncio.wait_for(q.get(), timeout=15.0)
-                except asyncio.TimeoutError:
-                    yield ": keepalive\n\n"
-                    continue
-                yield f"data: {json.dumps(event)}\n\n"
-        finally:
-            stream.unsubscribe(q)
-
-    return StreamingResponse(
-        event_source(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+@router.get("/sse/stream", response_class=EventSourceResponse)
+async def sse_stream() -> AsyncIterable[dict]:
+    q = stream.subscribe()
+    try:
+        while True:
+            event = await q.get()
+            yield event
+    except asyncio.QueueShutDown:
+        print("stream ended, queue shutdown")
+    finally:
+        stream.unsubscribe(q)
