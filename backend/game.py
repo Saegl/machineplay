@@ -15,12 +15,16 @@ class GameStream:
         self.board = chess.Board()
         self.subscribers: set[asyncio.Queue[dict]] = set()
         self._task: asyncio.Task | None = None
+        self.white_name: str | None = None
+        self.black_name: str | None = None
 
     def snapshot(self) -> dict:
         return {
             "type": "fen",
             "fen": self.board.fen(),
             "ply": self.board.ply(),
+            "white_name": self.white_name,
+            "black_name": self.black_name,
         }
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -43,7 +47,9 @@ class GameStream:
                     "subscriber queue full, dropping event type=%s", event.get("type")
                 )
 
-    async def start_game(self, white_cmd: str, black_cmd: str) -> None:
+    async def start_game(
+        self, white_cmd: str, black_cmd: str, white_name: str, black_name: str
+    ) -> None:
         if self._task and not self._task.done():
             logger.info("cancelling in-progress game before starting a new one")
             self._task.cancel()
@@ -51,12 +57,22 @@ class GameStream:
                 await self._task
             except (asyncio.CancelledError, Exception):
                 pass
-        logger.info("starting game: white=%r black=%r tc=%s", white_cmd, black_cmd, TC)
+        logger.info(
+            "starting game: white=%r black=%r tc=%s", white_name, black_name, TC
+        )
+        self.white_name = white_name
+        self.black_name = black_name
         self._task = asyncio.create_task(self._play_one_game(white_cmd, black_cmd))
 
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
-        self._broadcast({"type": "game_start"})
+        self._broadcast(
+            {
+                "type": "game_start",
+                "white_name": self.white_name,
+                "black_name": self.black_name,
+            }
+        )
         self._broadcast(self.snapshot())
 
         base, inc = parse_tc(TC)

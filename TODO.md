@@ -22,7 +22,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Decide license (MIT/Apache-2.0) and add `LICENSE`
 
 ## M1 — Frontend polish (warm-up wins)
-- [ ] Show engine names above the board during a game (white / black labels)
+- [x] Show engine names above the board during a game (white / black labels)
 - [ ] Show move count / ply counter as "move 12" instead of "ply 24"
 - [ ] Render a move list panel next to the board (SAN, scrollable)
 - [ ] Show captured pieces under each side

@@ -6,9 +6,9 @@ const API_URL = import.meta.env.VITE_API_URL
 const SSE_URL = API_URL + '/sse/stream'
 
 type StreamEvent =
-  | { type: 'fen'; fen: string; ply: number }
+  | { type: 'fen'; fen: string; ply: number; white_name: string | null; black_name: string | null }
   | { type: 'move'; uci: string; from: string; to: string; fen: string; ply: number }
-  | { type: 'game_start' }
+  | { type: 'game_start'; white_name: string | null; black_name: string | null }
   | { type: 'game_end'; result: string }
 
 type Engine = {
@@ -28,6 +28,8 @@ function App() {
   const [blackId, setBlackId] = useState('')
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
+  const [whiteName, setWhiteName] = useState<string | null>(null)
+  const [blackName, setBlackName] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(API_URL + '/engine')
@@ -55,6 +57,8 @@ function App() {
         api.set({ fen: event.fen })
         setPly(event.ply)
         setResult(null)
+        setWhiteName(event.white_name)
+        setBlackName(event.black_name)
       } else if (event.type === 'move') {
         api.set({
           fen: event.fen,
@@ -63,6 +67,8 @@ function App() {
         setPly(event.ply)
       } else if (event.type === 'game_start') {
         setResult(null)
+        setWhiteName(event.white_name)
+        setBlackName(event.black_name)
       } else if (event.type === 'game_end') {
         setResult(event.result)
       }
@@ -95,12 +101,22 @@ function App() {
     <main className="min-h-dvh flex flex-col items-center justify-center gap-4 sm:gap-6 px-4 py-6 bg-neutral-950 text-neutral-100">
       <h1 className="text-2xl sm:text-3xl font-semibold">machineplay</h1>
 
-      <Chessground
-        config={{ viewOnly: true, coordinates: true }}
-        onReady={(api) => {
-          apiRef.current = api
-        }}
-      />
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-baseline gap-2 text-sm">
+          <span className="text-neutral-500 uppercase tracking-wide text-xs">black</span>
+          <span className="text-neutral-100 font-medium">{blackName ?? '—'}</span>
+        </div>
+        <Chessground
+          config={{ viewOnly: true, coordinates: true }}
+          onReady={(api) => {
+            apiRef.current = api
+          }}
+        />
+        <div className="flex items-baseline gap-2 text-sm">
+          <span className="text-neutral-500 uppercase tracking-wide text-xs">white</span>
+          <span className="text-neutral-100 font-medium">{whiteName ?? '—'}</span>
+        </div>
+      </div>
 
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-center text-sm">
         <label className="flex items-center gap-2">

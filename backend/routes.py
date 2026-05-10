@@ -25,7 +25,7 @@ async def start_game(payload: StartGameRequest) -> dict:
     black = await Engine.get(payload.black_engine_id)
     if white is None or black is None:
         raise HTTPException(status_code=404, detail="engine not found")
-    await stream.start_game(white.command, black.command)
+    await stream.start_game(white.command, black.command, white.name, black.name)
     return {"status": "started", "white": str(white.id), "black": str(black.id)}
 
 
