@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        logger.info("lifespan `finally` start")
         if stream._task and not stream._task.done():
             stream._task.cancel()
         await client.close()
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
             q.shutdown()
 
         stream.subscribers.clear()
+        logger.info("lifespan `finally` end")
 
 
 app = FastAPI(lifespan=lifespan)

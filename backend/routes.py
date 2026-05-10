@@ -38,5 +38,8 @@ async def sse_stream() -> AsyncIterable[dict]:
             yield event
     except asyncio.QueueShutDown:
         logger.info("stream ended, queue shutdown")
+    except asyncio.CancelledError:
+        logger.info("SSE cancelled")
+        raise
     finally:
         stream.unsubscribe(q)
