@@ -1,5 +1,5 @@
 run-backend:
-    cd backend && uvicorn app:app --reload
+    cd backend && uvicorn app:app --reload --timeout-graceful-shutdown 0
 
 run-frontend:
     cd frontend && pnpm dev
