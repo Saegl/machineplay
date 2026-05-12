@@ -158,7 +158,7 @@ function App() {
 
       <div className="text-xs text-neutral-500 flex gap-4">
         <span>{status}</span>
-        {ply !== null && <span>ply {ply}</span>}
+        {ply !== null && <span>move {Math.ceil(ply / 2)}</span>}
         {result && <span className="text-neutral-300">result {result}</span>}
         {startError && <span className="text-red-400">{startError}</span>}
       </div>
