@@ -13,10 +13,33 @@ type StreamEvent =
       white_name: string | null
       black_name: string | null
       moves: string[]
+      white_clock: number
+      black_clock: number
     }
-  | { type: 'move'; uci: string; san: string; from: string; to: string; fen: string; ply: number }
+  | {
+      type: 'move'
+      uci: string
+      san: string
+      from: string
+      to: string
+      fen: string
+      ply: number
+      white_clock: number
+      black_clock: number
+    }
   | { type: 'game_start'; white_name: string | null; black_name: string | null }
   | { type: 'game_end'; result: string }
+
+type Clocks = { white: number; black: number; updatedAt: number }
+
+function formatClock(s: number): string {
+  if (s >= 60) {
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${String(sec).padStart(2, '0')}`
+  }
+  return s.toFixed(1)
+}
 
 type Engine = {
   id: string
@@ -82,13 +105,32 @@ function App() {
   const [moves, setMoves] = useState<string[]>([])
   const [fen, setFen] = useState<string>(START_FEN)
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
+  const [clocks, setClocks] = useState<Clocks | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   const moveListRef = useRef<HTMLOListElement | null>(null)
   const { byWhite, byBlack } = captured(fen)
+  const sideToMove: 'white' | 'black' = fen.split(' ')[1] === 'b' ? 'black' : 'white'
+  const isClockTicking = clocks !== null && result === null
+  const elapsedSinceUpdate = clocks ? Math.max(0, (now - clocks.updatedAt) / 1000) : 0
+  const displayWhite = clocks
+    ? sideToMove === 'white' && isClockTicking
+      ? Math.max(0, clocks.white - elapsedSinceUpdate)
+      : clocks.white
+    : null
+  const displayBlack = clocks
+    ? sideToMove === 'black' && isClockTicking
+      ? Math.max(0, clocks.black - elapsedSinceUpdate)
+      : clocks.black
+    : null
   const topIsBlack = orientation === 'white'
   const topName = topIsBlack ? blackName : whiteName
   const bottomName = topIsBlack ? whiteName : blackName
   const topCaptured = topIsBlack ? byBlack : byWhite
   const bottomCaptured = topIsBlack ? byWhite : byBlack
+  const topClock = topIsBlack ? displayBlack : displayWhite
+  const bottomClock = topIsBlack ? displayWhite : displayBlack
+  const topActive = isClockTicking && sideToMove === (topIsBlack ? 'black' : 'white')
+  const bottomActive = isClockTicking && sideToMove === (topIsBlack ? 'white' : 'black')
 
   useEffect(() => {
     fetch(API_URL + '/engine')
@@ -120,6 +162,7 @@ function App() {
         setBlackName(event.black_name)
         setMoves(event.moves ?? [])
         setFen(event.fen)
+        setClocks({ white: event.white_clock, black: event.black_clock, updatedAt: Date.now() })
       } else if (event.type === 'move') {
         api.set({
           fen: event.fen,
@@ -128,12 +171,14 @@ function App() {
         setPly(event.ply)
         setMoves((prev) => [...prev, event.san])
         setFen(event.fen)
+        setClocks({ white: event.white_clock, black: event.black_clock, updatedAt: Date.now() })
       } else if (event.type === 'game_start') {
         setResult(null)
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves([])
         setFen(START_FEN)
+        setClocks(null)
       } else if (event.type === 'game_end') {
         setResult(event.result)
       }
@@ -145,6 +190,12 @@ function App() {
     const el = moveListRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [moves])
+
+  useEffect(() => {
+    if (!isClockTicking) return
+    const id = setInterval(() => setNow(Date.now()), 100)
+    return () => clearInterval(id)
+  }, [isClockTicking])
 
   const startGame = async () => {
     if (!whiteId || !blackId) return
@@ -178,6 +229,17 @@ function App() {
           </span>
           <span className="text-neutral-100 font-medium">{topName ?? '—'}</span>
           <CapturedPieces pieces={topCaptured} />
+          {topClock !== null && (
+            <span
+              className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
+                topActive
+                  ? 'bg-neutral-100 text-neutral-900'
+                  : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+              }`}
+            >
+              {formatClock(topClock)}
+            </span>
+          )}
         </div>
         <div className="relative sm:col-start-1 sm:row-start-2">
           <Chessground
@@ -216,6 +278,17 @@ function App() {
           </span>
           <span className="text-neutral-100 font-medium">{bottomName ?? '—'}</span>
           <CapturedPieces pieces={bottomCaptured} />
+          {bottomClock !== null && (
+            <span
+              className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
+                bottomActive
+                  ? 'bg-neutral-100 text-neutral-900'
+                  : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+              }`}
+            >
+              {formatClock(bottomClock)}
+            </span>
+          )}
         </div>
         <ol
           ref={moveListRef}

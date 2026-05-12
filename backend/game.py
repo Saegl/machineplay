@@ -18,6 +18,7 @@ class GameStream:
         self.white_name: str | None = None
         self.black_name: str | None = None
         self.san_moves: list[str] = []
+        self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
 
     def snapshot(self) -> dict:
         return {
@@ -27,6 +28,8 @@ class GameStream:
             "white_name": self.white_name,
             "black_name": self.black_name,
             "moves": list(self.san_moves),
+            "white_clock": self.clocks[chess.WHITE],
+            "black_clock": self.clocks[chess.BLACK],
         }
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -69,6 +72,8 @@ class GameStream:
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
         self.san_moves = []
+        base, inc = parse_tc(TC)
+        self.clocks = {chess.WHITE: base, chess.BLACK: base}
         self._broadcast(
             {
                 "type": "game_start",
@@ -78,9 +83,6 @@ class GameStream:
         )
         self._broadcast(self.snapshot())
 
-        base, inc = parse_tc(TC)
-        clocks = {chess.WHITE: base, chess.BLACK: base}
-
         _, white = await chess.engine.popen_uci(white_cmd)
         _, black = await chess.engine.popen_uci(black_cmd)
         engines = {chess.WHITE: white, chess.BLACK: black}
@@ -89,8 +91,8 @@ class GameStream:
             while not self.board.is_game_over(claim_draw=True):
                 side = self.board.turn
                 limit = chess.engine.Limit(
-                    white_clock=clocks[chess.WHITE],
-                    black_clock=clocks[chess.BLACK],
+                    white_clock=self.clocks[chess.WHITE],
+                    black_clock=self.clocks[chess.BLACK],
                     white_inc=inc,
                     black_inc=inc,
                 )
@@ -98,7 +100,7 @@ class GameStream:
                 t0 = loop.time()
                 result = await engines[side].play(self.board, limit)
                 elapsed = loop.time() - t0
-                clocks[side] = max(0.0, clocks[side] - elapsed + inc)
+                self.clocks[side] = max(0.0, self.clocks[side] - elapsed + inc)
 
                 move = result.move
                 if move is None or move not in self.board.legal_moves:
@@ -119,6 +121,8 @@ class GameStream:
                         "to": uci[2:4],
                         "fen": self.board.fen(),
                         "ply": self.board.ply(),
+                        "white_clock": self.clocks[chess.WHITE],
+                        "black_clock": self.clocks[chess.BLACK],
                     }
                 )
         finally:
