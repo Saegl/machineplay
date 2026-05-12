@@ -19,6 +19,8 @@ class GameStream:
         self.black_name: str | None = None
         self.san_moves: list[str] = []
         self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
+        self.result: str | None = None
+        self.status: str = "idle"  # "idle" | "playing" | "ended"
 
     def snapshot(self) -> dict:
         return {
@@ -30,6 +32,8 @@ class GameStream:
             "moves": list(self.san_moves),
             "white_clock": self.clocks[chess.WHITE],
             "black_clock": self.clocks[chess.BLACK],
+            "result": self.result,
+            "status": self.status,
         }
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -72,6 +76,8 @@ class GameStream:
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
         self.san_moves = []
+        self.result = None
+        self.status = "playing"
         base, inc = parse_tc(TC)
         self.clocks = {chess.WHITE: base, chess.BLACK: base}
         self._broadcast(
@@ -129,9 +135,10 @@ class GameStream:
             await white.quit()
             await black.quit()
 
-        result_str = self.board.result(claim_draw=True)
-        logger.info("game ended result=%s plies=%d", result_str, self.board.ply())
-        self._broadcast({"type": "game_end", "result": result_str})
+        self.result = self.board.result(claim_draw=True)
+        self.status = "ended"
+        logger.info("game ended result=%s plies=%d", self.result, self.board.ply())
+        self._broadcast({"type": "game_end", "result": self.result})
 
 
 stream = GameStream()

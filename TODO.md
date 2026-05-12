@@ -51,7 +51,7 @@ The frontend is a single `App.tsx` today. Wire up routing and stub each page; la
 ## M2 — Clocks & game state
 - [x] Send clocks in the `move` event from backend (already tracked in `game.py`, just include them)
 - [x] Render two clocks on the frontend, ticking down for the side to move
-- [ ] Show `game_end` as a banner overlay (1-0 / 0-1 / ½-½) with reason
+- [x] Show `game_end` as a banner overlay (1-0 / 0-1 / ½-½) with reason
 - [ ] Surface engine resign / time-loss reasons (currently only `is_game_over`)
 - [ ] If an engine process crashes mid-game, end with forfeit by that side
 

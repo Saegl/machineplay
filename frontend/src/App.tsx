@@ -5,6 +5,8 @@ import { Chessground } from './Chessground'
 const API_URL = import.meta.env.VITE_API_URL
 const SSE_URL = API_URL + '/sse/stream'
 
+type GameStatus = 'idle' | 'playing' | 'ended'
+
 type StreamEvent =
   | {
       type: 'fen'
@@ -15,6 +17,8 @@ type StreamEvent =
       moves: string[]
       white_clock: number
       black_clock: number
+      result: string | null
+      status: GameStatus
     }
   | {
       type: 'move'
@@ -106,11 +110,13 @@ function App() {
   const [fen, setFen] = useState<string>(START_FEN)
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const [clocks, setClocks] = useState<Clocks | null>(null)
+  const [gameStatus, setGameStatus] = useState<GameStatus>('idle')
   const [now, setNow] = useState(() => Date.now())
   const moveListRef = useRef<HTMLOListElement | null>(null)
   const { byWhite, byBlack } = captured(fen)
   const sideToMove: 'white' | 'black' = fen.split(' ')[1] === 'b' ? 'black' : 'white'
-  const isClockTicking = clocks !== null && result === null
+  const isClockTicking = gameStatus === 'playing'
+  const showClocks = gameStatus !== 'idle' && clocks !== null
   const elapsedSinceUpdate = clocks ? Math.max(0, (now - clocks.updatedAt) / 1000) : 0
   const displayWhite = clocks
     ? sideToMove === 'white' && isClockTicking
@@ -157,12 +163,13 @@ function App() {
       if (event.type === 'fen') {
         api.set({ fen: event.fen })
         setPly(event.ply)
-        setResult(null)
+        setResult(event.result)
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves(event.moves ?? [])
         setFen(event.fen)
         setClocks({ white: event.white_clock, black: event.black_clock, updatedAt: Date.now() })
+        setGameStatus(event.status)
       } else if (event.type === 'move') {
         api.set({
           fen: event.fen,
@@ -179,8 +186,10 @@ function App() {
         setMoves([])
         setFen(START_FEN)
         setClocks(null)
+        setGameStatus('playing')
       } else if (event.type === 'game_end') {
         setResult(event.result)
+        setGameStatus('ended')
       }
     }
     return () => es.close()
@@ -229,7 +238,7 @@ function App() {
           </span>
           <span className="text-neutral-100 font-medium">{topName ?? '—'}</span>
           <CapturedPieces pieces={topCaptured} />
-          {topClock !== null && (
+          {showClocks && topClock !== null && (
             <span
               className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
                 topActive
@@ -278,7 +287,7 @@ function App() {
           </span>
           <span className="text-neutral-100 font-medium">{bottomName ?? '—'}</span>
           <CapturedPieces pieces={bottomCaptured} />
-          {bottomClock !== null && (
+          {showClocks && bottomClock !== null && (
             <span
               className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
                 bottomActive
@@ -306,6 +315,13 @@ function App() {
             ))
           )}
         </ol>
+        <div className="text-sm text-center sm:col-start-2 sm:row-start-3">
+          {gameStatus === 'ended' && result ? (
+            <span className="text-neutral-100 font-medium">{result}</span>
+          ) : gameStatus === 'playing' ? (
+            <span className="text-neutral-500 italic">playing</span>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-center text-sm">
@@ -359,7 +375,6 @@ function App() {
           }`}
         />
         {ply !== null && <span>move {Math.ceil(ply / 2)}</span>}
-        {result && <span className="text-neutral-300">result {result}</span>}
         {startError && <span className="text-red-400">{startError}</span>}
       </div>
     </main>
