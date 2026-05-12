@@ -169,7 +169,7 @@ function App() {
 
   return (
     <main className="min-h-dvh flex flex-col items-center justify-center gap-4 sm:gap-6 px-4 py-6 bg-neutral-950 text-neutral-100">
-      <h1 className="text-2xl sm:text-3xl font-semibold">machineplay</h1>
+      <h1 className="text-2xl sm:text-3xl font-semibold">MachinePlay</h1>
 
       <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
         <div className="flex flex-wrap items-center gap-2 text-sm max-w-[var(--board-size)] sm:col-start-1 sm:row-start-1">
