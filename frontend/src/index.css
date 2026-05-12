@@ -9,6 +9,17 @@ body {
   --board-size: min(calc(100vw - 2rem), calc(100dvh - 8rem), 480px);
 }
 
+/* chessground 10.x: brown.css assigns rank coord colors via :nth-child without
+   accounting for the column-reverse layout, so colors land inverted. Flip them. */
+.cg-wrap.orientation-white .ranks :nth-child(odd),
+.cg-wrap.orientation-black .ranks :nth-child(even) {
+  color: rgba(255, 255, 255, 0.8);
+}
+.cg-wrap.orientation-white .ranks :nth-child(even),
+.cg-wrap.orientation-black .ranks :nth-child(odd) {
+  color: rgba(72, 72, 72, 0.8);
+}
+
 .cg-wrap {
   width: var(--board-size);
   aspect-ratio: 1;
