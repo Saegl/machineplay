@@ -273,8 +273,18 @@ function App() {
         </button>
       </div>
 
-      <div className="text-xs text-neutral-500 flex gap-4">
-        <span>{status}</span>
+      <div className="text-xs text-neutral-500 flex items-center gap-4">
+        <span
+          aria-label={status}
+          title={status}
+          className={`inline-block w-2 h-2 rounded-full ${
+            status === 'connected'
+              ? 'bg-green-500'
+              : status === 'connecting'
+                ? 'bg-amber-400'
+                : 'bg-red-500'
+          }`}
+        />
         {ply !== null && <span>move {Math.ceil(ply / 2)}</span>}
         {result && <span className="text-neutral-300">result {result}</span>}
         {startError && <span className="text-red-400">{startError}</span>}
