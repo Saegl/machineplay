@@ -29,7 +29,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Add a "flip board" button
 - [x] Show the SSE connection status as a small dot (green/red), not a word
 - [x] Make the board responsive on mobile (board fits viewport, controls below)
-- [ ] Add a favicon
+- [x] Add a favicon
 - [ ] Add basic page title + meta description
 - [ ] Loading skeleton while engines list is fetching
 - [ ] Error toast instead of inline `startError` text
