@@ -172,7 +172,7 @@ function App() {
       <h1 className="text-2xl sm:text-3xl font-semibold">machineplay</h1>
 
       <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
-        <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-1">
+        <div className="flex flex-wrap items-center gap-2 text-sm max-w-[var(--board-size)] sm:col-start-1 sm:row-start-1">
           <span className="text-neutral-500 uppercase tracking-wide text-xs">
             {topIsBlack ? 'black' : 'white'}
           </span>
@@ -210,7 +210,7 @@ function App() {
             </svg>
           </button>
         </div>
-        <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-3">
+        <div className="flex flex-wrap items-center gap-2 text-sm max-w-[var(--board-size)] sm:col-start-1 sm:row-start-3">
           <span className="text-neutral-500 uppercase tracking-wide text-xs">
             {topIsBlack ? 'white' : 'black'}
           </span>
