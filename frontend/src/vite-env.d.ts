@@ -7,3 +7,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+declare namespace React.JSX {
+  interface IntrinsicElements {
+    piece: React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>
+  }
+}

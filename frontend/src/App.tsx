@@ -25,6 +25,48 @@ type Engine = {
   description: string
 }
 
+const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+const PIECE_NAMES: Record<string, string> = {
+  q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
+}
+
+const PIECE_ORDER = ['q', 'r', 'b', 'n', 'p'] as const
+
+type CapturedPiece = { type: string; color: 'white' | 'black' }
+
+function captured(fen: string): { byWhite: CapturedPiece[]; byBlack: CapturedPiece[] } {
+  const board = fen.split(' ')[0]
+  const counts: Record<string, number> = {}
+  for (const ch of board) {
+    if (/[a-zA-Z]/.test(ch)) counts[ch] = (counts[ch] ?? 0) + 1
+  }
+  const start: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 }
+  const byWhite: CapturedPiece[] = []
+  const byBlack: CapturedPiece[] = []
+  for (const p of PIECE_ORDER) {
+    const whiteCaptured = Math.max(0, start[p] - (counts[p] ?? 0))
+    const blackCaptured = Math.max(0, start[p] - (counts[p.toUpperCase()] ?? 0))
+    const net = whiteCaptured - blackCaptured
+    if (net > 0) {
+      for (let i = 0; i < net; i++) byWhite.push({ type: PIECE_NAMES[p], color: 'black' })
+    } else if (net < 0) {
+      for (let i = 0; i < -net; i++) byBlack.push({ type: PIECE_NAMES[p], color: 'white' })
+    }
+  }
+  return { byWhite, byBlack }
+}
+
+function CapturedPieces({ pieces }: { pieces: CapturedPiece[] }) {
+  return (
+    <span className="cg-wrap captured-pieces">
+      {pieces.map((p, i) => (
+        <piece key={i} className={`${p.type} ${p.color}`} />
+      ))}
+    </span>
+  )
+}
+
 function App() {
   const apiRef = useRef<Api | null>(null)
   const [status, setStatus] = useState('connecting')
@@ -38,7 +80,9 @@ function App() {
   const [whiteName, setWhiteName] = useState<string | null>(null)
   const [blackName, setBlackName] = useState<string | null>(null)
   const [moves, setMoves] = useState<string[]>([])
+  const [fen, setFen] = useState<string>(START_FEN)
   const moveListRef = useRef<HTMLOListElement | null>(null)
+  const { byWhite, byBlack } = captured(fen)
 
   useEffect(() => {
     fetch(API_URL + '/engine')
@@ -69,6 +113,7 @@ function App() {
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves(event.moves ?? [])
+        setFen(event.fen)
       } else if (event.type === 'move') {
         api.set({
           fen: event.fen,
@@ -76,11 +121,13 @@ function App() {
         })
         setPly(event.ply)
         setMoves((prev) => [...prev, event.san])
+        setFen(event.fen)
       } else if (event.type === 'game_start') {
         setResult(null)
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves([])
+        setFen(START_FEN)
       } else if (event.type === 'game_end') {
         setResult(event.result)
       }
@@ -119,9 +166,10 @@ function App() {
       <h1 className="text-2xl sm:text-3xl font-semibold">machineplay</h1>
 
       <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
-        <div className="flex items-baseline gap-2 text-sm sm:col-start-1 sm:row-start-1">
+        <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-1">
           <span className="text-neutral-500 uppercase tracking-wide text-xs">black</span>
           <span className="text-neutral-100 font-medium">{blackName ?? '—'}</span>
+          <CapturedPieces pieces={byBlack} />
         </div>
         <div className="sm:col-start-1 sm:row-start-2">
           <Chessground
@@ -131,9 +179,10 @@ function App() {
             }}
           />
         </div>
-        <div className="flex items-baseline gap-2 text-sm sm:col-start-1 sm:row-start-3">
+        <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-3">
           <span className="text-neutral-500 uppercase tracking-wide text-xs">white</span>
           <span className="text-neutral-100 font-medium">{whiteName ?? '—'}</span>
+          <CapturedPieces pieces={byWhite} />
         </div>
         <ol
           ref={moveListRef}

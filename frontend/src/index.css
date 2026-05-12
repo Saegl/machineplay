@@ -14,3 +14,37 @@ body {
   aspect-ratio: 1;
   position: relative;
 }
+
+.cg-wrap.captured-pieces {
+  width: auto;
+  aspect-ratio: auto;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  min-height: 1.75rem;
+  background: #f0d9b5;
+  border-radius: 0.25rem;
+  padding: 0 0.375rem;
+}
+
+.cg-wrap.captured-pieces:empty {
+  background: transparent;
+  padding: 0;
+}
+
+.cg-wrap.captured-pieces piece {
+  position: relative;
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.75rem;
+  top: auto;
+  left: auto;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.cg-wrap.captured-pieces piece + piece {
+  margin-left: -0.25rem;
+}
