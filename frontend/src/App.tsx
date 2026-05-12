@@ -81,8 +81,14 @@ function App() {
   const [blackName, setBlackName] = useState<string | null>(null)
   const [moves, setMoves] = useState<string[]>([])
   const [fen, setFen] = useState<string>(START_FEN)
+  const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const moveListRef = useRef<HTMLOListElement | null>(null)
   const { byWhite, byBlack } = captured(fen)
+  const topIsBlack = orientation === 'white'
+  const topName = topIsBlack ? blackName : whiteName
+  const bottomName = topIsBlack ? whiteName : blackName
+  const topCaptured = topIsBlack ? byBlack : byWhite
+  const bottomCaptured = topIsBlack ? byWhite : byBlack
 
   useEffect(() => {
     fetch(API_URL + '/engine')
@@ -167,22 +173,49 @@ function App() {
 
       <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
         <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-1">
-          <span className="text-neutral-500 uppercase tracking-wide text-xs">black</span>
-          <span className="text-neutral-100 font-medium">{blackName ?? '—'}</span>
-          <CapturedPieces pieces={byBlack} />
+          <span className="text-neutral-500 uppercase tracking-wide text-xs">
+            {topIsBlack ? 'black' : 'white'}
+          </span>
+          <span className="text-neutral-100 font-medium">{topName ?? '—'}</span>
+          <CapturedPieces pieces={topCaptured} />
         </div>
-        <div className="sm:col-start-1 sm:row-start-2">
+        <div className="relative sm:col-start-1 sm:row-start-2">
           <Chessground
-            config={{ viewOnly: true, coordinates: true }}
+            config={{ viewOnly: true, coordinates: true, orientation }}
             onReady={(api) => {
               apiRef.current = api
             }}
           />
+          <button
+            type="button"
+            onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
+            aria-label="flip board"
+            title="flip board"
+            className="absolute -top-2 -right-2 bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 rounded-full p-1.5 leading-none shadow"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M17 2l4 4-4 4" />
+              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+              <path d="M7 22l-4-4 4-4" />
+              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+            </svg>
+          </button>
         </div>
         <div className="flex items-center gap-2 text-sm sm:col-start-1 sm:row-start-3">
-          <span className="text-neutral-500 uppercase tracking-wide text-xs">white</span>
-          <span className="text-neutral-100 font-medium">{whiteName ?? '—'}</span>
-          <CapturedPieces pieces={byWhite} />
+          <span className="text-neutral-500 uppercase tracking-wide text-xs">
+            {topIsBlack ? 'white' : 'black'}
+          </span>
+          <span className="text-neutral-100 font-medium">{bottomName ?? '—'}</span>
+          <CapturedPieces pieces={bottomCaptured} />
         </div>
         <ol
           ref={moveListRef}

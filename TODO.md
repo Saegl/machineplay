@@ -26,7 +26,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Show move count / ply counter as "move 12" instead of "ply 24"
 - [x] Render a move list panel next to the board (SAN, scrollable)
 - [x] Show captured pieces under each side
-- [ ] Add a "flip board" button
+- [x] Add a "flip board" button
 - [ ] Add a "copy FEN" button
 - [ ] Show the SSE connection status as a small dot (green/red), not a word
 - [ ] Make the board responsive on mobile (board fits viewport, controls below)
