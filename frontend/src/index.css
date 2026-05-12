@@ -5,8 +5,12 @@ body {
   background: #0a0a0a; /* neutral-950 — prevents white gap on scroll bounce */
 }
 
+:root {
+  --board-size: min(calc(100vw - 2rem), calc(100dvh - 8rem), 480px);
+}
+
 .cg-wrap {
-  width: min(calc(100vw - 2rem), calc(100dvh - 8rem), 480px);
+  width: var(--board-size);
   aspect-ratio: 1;
   position: relative;
 }

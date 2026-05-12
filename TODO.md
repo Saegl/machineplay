@@ -24,7 +24,7 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 ## M1 — Frontend polish (warm-up wins)
 - [x] Show engine names above the board during a game (white / black labels)
 - [x] Show move count / ply counter as "move 12" instead of "ply 24"
-- [ ] Render a move list panel next to the board (SAN, scrollable)
+- [x] Render a move list panel next to the board (SAN, scrollable)
 - [ ] Show captured pieces under each side
 - [ ] Add a "flip board" button
 - [ ] Add a "copy FEN" button

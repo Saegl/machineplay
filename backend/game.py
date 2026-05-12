@@ -17,6 +17,7 @@ class GameStream:
         self._task: asyncio.Task | None = None
         self.white_name: str | None = None
         self.black_name: str | None = None
+        self.san_moves: list[str] = []
 
     def snapshot(self) -> dict:
         return {
@@ -25,6 +26,7 @@ class GameStream:
             "ply": self.board.ply(),
             "white_name": self.white_name,
             "black_name": self.black_name,
+            "moves": list(self.san_moves),
         }
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -66,6 +68,7 @@ class GameStream:
 
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
+        self.san_moves = []
         self._broadcast(
             {
                 "type": "game_start",
@@ -104,11 +107,14 @@ class GameStream:
                     )
                     break
                 uci = move.uci()
+                san = self.board.san(move)
                 self.board.push(move)
+                self.san_moves.append(san)
                 self._broadcast(
                     {
                         "type": "move",
                         "uci": uci,
+                        "san": san,
                         "from": uci[:2],
                         "to": uci[2:4],
                         "fen": self.board.fen(),
