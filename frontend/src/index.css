@@ -23,8 +23,10 @@ body {
 /* chessground's default `coords.files` is `left: 24px; width: 100%`, which
    extends 24px past the board's right edge — fine when .cg-wrap has extra
    padding around the board, but in our setup .cg-wrap IS the board, so this
-   causes horizontal page scroll on mobile. Pin files coords inside. */
-.cg-wrap coords.files {
+   causes horizontal page scroll on mobile. Pin files coords inside.
+   Selector includes `cg-container` to outrank chessground's same-specificity
+   default rule (chessground's CSS is imported after ours in main.tsx). */
+.cg-wrap cg-container coords.files {
   left: 0;
 }
 
