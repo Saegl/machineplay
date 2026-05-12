@@ -31,8 +31,6 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 - [x] Make the board responsive on mobile (board fits viewport, controls below)
 - [x] Add a favicon
 - [x] Add basic page title + meta description
-- [ ] Loading skeleton while engines list is fetching
-- [ ] Error toast instead of inline `startError` text
 
 ## M1.5 — Routing & pages
 The frontend is a single `App.tsx` today. Wire up routing and stub each page; later milestones fill the content in.
