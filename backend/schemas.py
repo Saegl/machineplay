@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from enums import GameStatus
+from enums import GameStatus, StreamStatus
 
 
 class StartGameRequest(BaseModel):
@@ -57,7 +57,7 @@ class FenEvent(BaseModel):
     white_clock: float
     black_clock: float
     result: str | None
-    status: str
+    status: StreamStatus
     game_id: str | None
 
 

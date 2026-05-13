@@ -6,7 +6,7 @@ import chess.engine
 import chess.pgn
 
 from config import TC, parse_tc
-from enums import GameStatus
+from enums import GameStatus, StreamStatus
 from models import Engine, Game, utcnow
 from schemas import FenEvent, GameEndEvent, GameStartEvent, MoveEvent, SSEEvent
 
@@ -18,13 +18,13 @@ class GameStream:
     def __init__(self) -> None:
         self.board = chess.Board()
         self.subscribers: set[asyncio.Queue[SSEEvent]] = set()
-        self._task: asyncio.Task | None = None
+        self._task: asyncio.Task[None] | None = None
         self.white_name: str | None = None
         self.black_name: str | None = None
         self.san_moves: list[str] = []
         self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
         self.result: str | None = None
-        self.status: str = "idle"  # "idle" | GameStatus
+        self.status: StreamStatus = StreamStatus.IDLE
         self.game_doc: Game | None = None
 
     def snapshot(self) -> FenEvent:
@@ -98,7 +98,7 @@ class GameStream:
         self.board.reset()
         self.san_moves = []
         self.result = None
-        self.status = GameStatus.PLAYING
+        self.status = StreamStatus.PLAYING
         base, inc = parse_tc(TC)
         self.clocks = {chess.WHITE: base, chess.BLACK: base}
         doc = self.game_doc
@@ -169,7 +169,7 @@ class GameStream:
             await black.quit()
 
         self.result = self.board.result(claim_draw=True)
-        self.status = GameStatus.ENDED
+        self.status = StreamStatus.ENDED
         logger.info("game ended result=%s plies=%d", self.result, self.board.ply())
         if doc is not None:
             doc.status = GameStatus.ENDED
