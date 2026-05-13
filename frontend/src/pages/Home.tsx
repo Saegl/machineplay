@@ -64,20 +64,16 @@ export default function Home() {
 
   useEffect(() => {
     let cancelled = false
-    const load = () =>
-      fetch(`${API_URL}/game`)
-        .then((r) => r.json())
-        .then((data: Game[]) => {
-          if (!cancelled) setGames(data)
-        })
-        .catch(() => {
-          if (!cancelled) setGamesError('failed to load games')
-        })
-    load()
-    const id = setInterval(load, 5_000)
+    fetch(`${API_URL}/game`)
+      .then((r) => r.json())
+      .then((data: Game[]) => {
+        if (!cancelled) setGames(data)
+      })
+      .catch(() => {
+        if (!cancelled) setGamesError('failed to load games')
+      })
     return () => {
       cancelled = true
-      clearInterval(id)
     }
   }, [])
 
