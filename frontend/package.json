@@ -12,6 +12,7 @@
   "dependencies": {
     "@lichess-org/chessground": "^10.1.1",
     "@tailwindcss/vite": "^4.2.4",
+    "chess.js": "^1.4.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-router": "^7.15.0",

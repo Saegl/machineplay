@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import type { Api } from '@lichess-org/chessground/api'
+import { Chess } from 'chess.js'
 import { Chessground } from '../Chessground'
 import {
   API_URL,
   SSE_URL,
-  START_FEN,
   type Game,
   type StreamEvent,
   type StreamStatus,
@@ -71,6 +71,22 @@ function CapturedPieces({ pieces }: { pieces: CapturedPiece[] }) {
   )
 }
 
+function replay(moves: string[], ply: number) {
+  const chess = new Chess()
+  let lastFrom: string | undefined
+  let lastTo: string | undefined
+  for (let i = 0; i < ply && i < moves.length; i++) {
+    try {
+      const m = chess.move(moves[i])
+      lastFrom = m.from
+      lastTo = m.to
+    } catch {
+      break
+    }
+  }
+  return { fen: chess.fen(), lastFrom, lastTo }
+}
+
 export default function GamePage() {
   const { id } = useParams<{ id: string }>()
   const apiRef = useRef<Api | null>(null)
@@ -80,13 +96,23 @@ export default function GamePage() {
   const [whiteName, setWhiteName] = useState<string | null>(null)
   const [blackName, setBlackName] = useState<string | null>(null)
   const [moves, setMoves] = useState<string[]>([])
-  const [fen, setFen] = useState<string>(START_FEN)
   const [result, setResult] = useState<string | null>(null)
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const [clocks, setClocks] = useState<Clocks | null>(null)
   const [gameStatus, setGameStatus] = useState<StreamStatus>('idle')
+  const [viewPly, setViewPly] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const moveListRef = useRef<HTMLOListElement | null>(null)
+  const activeRowRef = useRef<HTMLLIElement | null>(null)
+
+  const effectiveViewPly = viewPly ?? moves.length
+  const following = viewPly === null && gameStatus === 'playing'
+  const isClockTicking = gameStatus === 'playing' && following
+
+  const { fen: displayFen, lastFrom, lastTo } = useMemo(
+    () => replay(moves, effectiveViewPly),
+    [moves, effectiveViewPly],
+  )
 
   useEffect(() => {
     if (!id) return
@@ -101,7 +127,6 @@ export default function GamePage() {
         setWhiteName(g.white_name)
         setBlackName(g.black_name)
         setMoves(g.moves)
-        setFen(g.fen)
         setResult(g.result)
         setGameStatus(g.status)
         setClocks({
@@ -109,7 +134,6 @@ export default function GamePage() {
           black: g.black_clock,
           updatedAt: Date.now(),
         })
-        apiRef.current?.set({ fen: g.fen })
       })
       .catch((e) => {
         if (!cancelled) setLoadError(String(e))
@@ -129,16 +153,13 @@ export default function GamePage() {
       )
     es.onmessage = (e) => {
       const event: StreamEvent = JSON.parse(e.data)
-      const api = apiRef.current
 
       if (event.type === 'fen') {
         liveGameIdRef.current = event.game_id
         if (event.game_id !== id) return
-        api?.set({ fen: event.fen })
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves(event.moves ?? [])
-        setFen(event.fen)
         setResult(event.result)
         setClocks({
           white: event.white_clock,
@@ -153,17 +174,12 @@ export default function GamePage() {
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves([])
-        setFen(START_FEN)
         setClocks(null)
         setGameStatus('playing')
+        setViewPly(null)
       } else if (event.type === 'move') {
         if (liveGameIdRef.current !== id) return
-        api?.set({
-          fen: event.fen,
-          lastMove: [event.from as never, event.to as never],
-        })
         setMoves((prev) => [...prev, event.san])
-        setFen(event.fen)
         setClocks({
           white: event.white_clock,
           black: event.black_clock,
@@ -179,15 +195,16 @@ export default function GamePage() {
   }, [id])
 
   useEffect(() => {
-    apiRef.current?.set({ fen })
-  }, [fen])
+    apiRef.current?.set({
+      fen: displayFen,
+      lastMove:
+        lastFrom && lastTo ? ([lastFrom, lastTo] as never) : undefined,
+    })
+  }, [displayFen, lastFrom, lastTo])
 
   useEffect(() => {
-    const el = moveListRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [moves])
-
-  const isClockTicking = gameStatus === 'playing'
+    activeRowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [effectiveViewPly, moves.length])
 
   useEffect(() => {
     if (!isClockTicking) return
@@ -195,9 +212,49 @@ export default function GamePage() {
     return () => clearInterval(id)
   }, [isClockTicking])
 
-  const { byWhite, byBlack } = captured(fen)
+  const jumpTo = (targetPly: number) => {
+    const clamped = Math.max(0, Math.min(moves.length, targetPly))
+    if (clamped === moves.length && gameStatus === 'playing') {
+      setViewPly(null)
+    } else {
+      setViewPly(clamped)
+    }
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'SELECT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        jumpTo(effectiveViewPly - 1)
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        jumpTo(effectiveViewPly + 1)
+      } else if (e.key === 'Home') {
+        e.preventDefault()
+        jumpTo(0)
+      } else if (e.key === 'End') {
+        e.preventDefault()
+        jumpTo(moves.length)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveViewPly, moves.length, gameStatus])
+
+  const { byWhite, byBlack } = captured(displayFen)
   const sideToMove: 'white' | 'black' =
-    fen.split(' ')[1] === 'b' ? 'black' : 'white'
+    displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
   const showClocks = gameStatus !== 'idle' && clocks !== null
   const elapsedSinceUpdate = clocks
     ? Math.max(0, (now - clocks.updatedAt) / 1000)
@@ -235,6 +292,8 @@ export default function GamePage() {
     )
   }
 
+  const showBanner = gameStatus === 'playing'
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 flex flex-col items-center gap-4 sm:gap-6">
       <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
@@ -261,7 +320,13 @@ export default function GamePage() {
             config={{ viewOnly: true, coordinates: true, orientation }}
             onReady={(api) => {
               apiRef.current = api
-              api.set({ fen })
+              api.set({
+                fen: displayFen,
+                lastMove:
+                  lastFrom && lastTo
+                    ? ([lastFrom, lastTo] as never)
+                    : undefined,
+              })
             }}
           />
           <button
@@ -310,26 +375,83 @@ export default function GamePage() {
             </span>
           )}
         </div>
-        <ol
-          ref={moveListRef}
-          className="bg-neutral-900 border border-neutral-800 rounded w-full h-32 sm:w-48 sm:h-[var(--board-size)] sm:col-start-2 sm:row-start-2 overflow-y-auto text-sm font-mono p-2 space-y-0.5"
-        >
-          {moves.length === 0 ? (
-            <li className="text-neutral-600 italic">no moves yet</li>
-          ) : (
-            Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-neutral-500 w-6 shrink-0 text-right">
-                  {i + 1}.
-                </span>
-                <span className="text-neutral-100 w-14 shrink-0">
-                  {moves[i * 2]}
-                </span>
-                <span className="text-neutral-300">{moves[i * 2 + 1] ?? ''}</span>
-              </li>
-            ))
+        <div className="flex flex-col w-full h-32 sm:w-48 sm:h-[var(--board-size)] sm:col-start-2 sm:row-start-2 bg-neutral-900 border border-neutral-800 rounded overflow-hidden">
+          <ol
+            ref={moveListRef}
+            className="flex-1 min-h-0 overflow-y-auto text-sm font-mono p-2 space-y-0.5"
+          >
+            {moves.length === 0 ? (
+              <li className="text-neutral-600 italic">no moves yet</li>
+            ) : (
+              Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => {
+                const wPly = i * 2 + 1
+                const bPly = i * 2 + 2
+                const wActive = effectiveViewPly === wPly
+                const bActive = effectiveViewPly === bPly
+                const isActiveRow = wActive || bActive
+                return (
+                  <li
+                    key={i}
+                    ref={isActiveRow ? activeRowRef : null}
+                    className="flex gap-2"
+                  >
+                    <span className="text-neutral-500 w-6 shrink-0 text-right">
+                      {i + 1}.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => jumpTo(wPly)}
+                      className={`w-14 shrink-0 text-left px-1 rounded ${
+                        wActive
+                          ? 'bg-neutral-100 text-neutral-900'
+                          : 'text-neutral-100 hover:bg-neutral-800'
+                      }`}
+                    >
+                      {moves[i * 2]}
+                    </button>
+                    {moves[i * 2 + 1] !== undefined && (
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(bPly)}
+                        className={`flex-1 text-left px-1 rounded ${
+                          bActive
+                            ? 'bg-neutral-100 text-neutral-900'
+                            : 'text-neutral-300 hover:bg-neutral-800'
+                        }`}
+                      >
+                        {moves[i * 2 + 1]}
+                      </button>
+                    )}
+                  </li>
+                )
+              })
+            )}
+          </ol>
+          {showBanner && (
+            <button
+              type="button"
+              onClick={() => jumpTo(moves.length)}
+              disabled={following}
+              title={
+                following
+                  ? 'following live moves'
+                  : 'click to follow the live game'
+              }
+              className={`mx-1 mb-1 px-2 py-1 text-xs rounded border flex items-center justify-center gap-1.5 transition-colors ${
+                following
+                  ? 'border-green-700 text-green-400 cursor-default'
+                  : 'border-neutral-700 text-neutral-300 hover:bg-neutral-800 cursor-pointer'
+              }`}
+            >
+              <span
+                className={`inline-block w-1.5 h-1.5 rounded-full ${
+                  following ? 'bg-green-500 animate-pulse' : 'bg-neutral-500'
+                }`}
+              />
+              {following ? 'following' : 'not following'}
+            </button>
           )}
-        </ol>
+        </div>
         <div className="text-sm text-center sm:col-start-2 sm:row-start-3">
           {gameStatus === 'ended' && result ? (
             <span className="text-neutral-100 font-medium">{result}</span>
@@ -351,7 +473,10 @@ export default function GamePage() {
                 : 'bg-red-500'
           }`}
         />
-        <span>move {Math.ceil(moves.length / 2)}</span>
+        <span>
+          move {Math.max(1, Math.ceil(effectiveViewPly / 2))}
+          {effectiveViewPly < moves.length ? ` / ${Math.ceil(moves.length / 2)}` : ''}
+        </span>
       </div>
     </div>
   )
