@@ -4,6 +4,10 @@ run-backend:
 test-backend:
     cd backend && uv run pytest
 
+coverage-backend:
+    cd backend && uv run pytest --cov --cov-report=term-missing --cov-report=html
+    xdg-open backend/htmlcov/index.html
+
 run-frontend:
     cd frontend && pnpm dev
 
