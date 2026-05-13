@@ -8,15 +8,15 @@ from fastapi.sse import EventSourceResponse
 
 from game import stream
 from models import Engine, Game
-from schemas import StartGameRequest
+from schemas import EngineOut, StartGameRequest
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/engine", response_model_by_alias=False)
-async def list_engines() -> list[Engine]:
+@router.get("/engine")
+async def list_engines() -> list[EngineOut]:
     return await Engine.find_all().to_list()
 
 
