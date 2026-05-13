@@ -3,8 +3,10 @@ import logging
 
 import chess
 import chess.engine
+import chess.pgn
 
 from config import TC, parse_tc
+from models import Engine, Game, utcnow
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +23,7 @@ class GameStream:
         self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
         self.result: str | None = None
         self.status: str = "idle"  # "idle" | "playing" | "ended"
+        self.game_doc: Game | None = None
 
     def snapshot(self) -> dict:
         return {
@@ -34,6 +37,7 @@ class GameStream:
             "black_clock": self.clocks[chess.BLACK],
             "result": self.result,
             "status": self.status,
+            "game_id": str(self.game_doc.id) if self.game_doc else None,
         }
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -56,9 +60,14 @@ class GameStream:
                     "subscriber queue full, dropping event type=%s", event.get("type")
                 )
 
-    async def start_game(
-        self, white_cmd: str, black_cmd: str, white_name: str, black_name: str
-    ) -> None:
+    def _build_pgn(self) -> str:
+        game = chess.pgn.Game.from_board(self.board)
+        game.headers["White"] = self.white_name or "?"
+        game.headers["Black"] = self.black_name or "?"
+        game.headers["Result"] = self.result or "*"
+        return str(game)
+
+    async def start_game(self, white: Engine, black: Engine) -> Game:
         if self._task and not self._task.done():
             logger.info("cancelling in-progress game before starting a new one")
             self._task.cancel()
@@ -67,11 +76,22 @@ class GameStream:
             except (asyncio.CancelledError, Exception):
                 pass
         logger.info(
-            "starting game: white=%r black=%r tc=%s", white_name, black_name, TC
+            "starting game: white=%r black=%r tc=%s", white.name, black.name, TC
         )
-        self.white_name = white_name
-        self.black_name = black_name
-        self._task = asyncio.create_task(self._play_one_game(white_cmd, black_cmd))
+        self.white_name = white.name
+        self.black_name = black.name
+        doc = Game(
+            white_id=white.id,
+            black_id=black.id,
+            white_name=white.name,
+            black_name=black.name,
+        )
+        await doc.insert()
+        self.game_doc = doc
+        self._task = asyncio.create_task(
+            self._play_one_game(white.command, black.command)
+        )
+        return doc
 
     async def _play_one_game(self, white_cmd: str, black_cmd: str) -> None:
         self.board.reset()
@@ -80,11 +100,19 @@ class GameStream:
         self.status = "playing"
         base, inc = parse_tc(TC)
         self.clocks = {chess.WHITE: base, chess.BLACK: base}
+        doc = self.game_doc
+        if doc is not None:
+            doc.status = "playing"
+            doc.fen = self.board.fen()
+            doc.white_clock = base
+            doc.black_clock = base
+            await doc.save()
         self._broadcast(
             {
                 "type": "game_start",
                 "white_name": self.white_name,
                 "black_name": self.black_name,
+                "game_id": str(doc.id) if doc else None,
             }
         )
         self._broadcast(self.snapshot())
@@ -118,6 +146,12 @@ class GameStream:
                 san = self.board.san(move)
                 self.board.push(move)
                 self.san_moves.append(san)
+                if doc is not None:
+                    doc.moves = list(self.san_moves)
+                    doc.fen = self.board.fen()
+                    doc.white_clock = self.clocks[chess.WHITE]
+                    doc.black_clock = self.clocks[chess.BLACK]
+                    await doc.save()
                 self._broadcast(
                     {
                         "type": "move",
@@ -138,6 +172,16 @@ class GameStream:
         self.result = self.board.result(claim_draw=True)
         self.status = "ended"
         logger.info("game ended result=%s plies=%d", self.result, self.board.ply())
+        if doc is not None:
+            doc.status = "ended"
+            doc.result = self.result
+            doc.ended_at = utcnow()
+            doc.pgn = self._build_pgn()
+            doc.fen = self.board.fen()
+            doc.moves = list(self.san_moves)
+            doc.white_clock = self.clocks[chess.WHITE]
+            doc.black_clock = self.clocks[chess.BLACK]
+            await doc.save()
         self._broadcast({"type": "game_end", "result": self.result})
 
 

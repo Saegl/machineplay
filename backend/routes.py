@@ -1,12 +1,13 @@
 import asyncio
 import logging
 from typing import AsyncIterable
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from fastapi.sse import EventSourceResponse
 
 from game import stream
-from models import Engine
+from models import Engine, Game
 from schemas import StartGameRequest
 
 
@@ -19,14 +20,33 @@ async def list_engines() -> list[Engine]:
     return await Engine.find_all().to_list()
 
 
-@router.post("/game")
+@router.post("/game", response_model_by_alias=False)
 async def start_game(payload: StartGameRequest) -> dict:
     white = await Engine.get(payload.white_engine_id)
     black = await Engine.get(payload.black_engine_id)
     if white is None or black is None:
         raise HTTPException(status_code=404, detail="engine not found")
-    await stream.start_game(white.command, black.command, white.name, black.name)
-    return {"status": "started", "white": str(white.id), "black": str(black.id)}
+    doc = await stream.start_game(white, black)
+    return {
+        "id": str(doc.id),
+        "status": "started",
+        "white": str(white.id),
+        "black": str(black.id),
+    }
+
+
+@router.get("/game", response_model_by_alias=False)
+async def list_games(limit: int = 50) -> list[Game]:
+    limit = max(1, min(limit, 200))
+    return await Game.find_all().sort(-Game.created_at).limit(limit).to_list()
+
+
+@router.get("/game/{game_id}", response_model_by_alias=False)
+async def get_game(game_id: UUID) -> Game:
+    doc = await Game.get(game_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="game not found")
+    return doc
 
 
 @router.get("/sse/stream", response_class=EventSourceResponse)
