@@ -34,19 +34,19 @@ Subgoals are intentionally tiny — each box should be one short session. Milest
 
 ## M1.5 — Routing & pages
 The frontend is a single `App.tsx` today. Wire up routing and stub each page; later milestones fill the content in.
-- [ ] Add `react-router` to the frontend
-- [ ] Shared layout: navbar with logo, links, login/avatar slot
-- [ ] `/` — home: live games + recent games + recent tournaments (filled by M4/M8)
-- [ ] `/engine` — list of all engines (M3)
-- [ ] `/engine/{id}` — engine detail page (M3)
-- [ ] `/engine/upload` — upload form (M6)
-- [ ] `/game/{id}` — single-game viewer with board + clocks + move list (M2/M4)
-- [ ] `/tournament` — list of all tournaments (M8)
-- [ ] `/tournament/new` — create-tournament form (M8)
-- [ ] `/tournament/{id}` — pairings + standings + live game link (M8)
-- [ ] `/u/{login}` — user profile: their engines and recent games (M5)
-- [ ] `/about` — short pitch + link to starter template (M7)
-- [ ] 404 page
+- [x] Add `react-router` to the frontend
+- [x] Shared layout: navbar with logo, links, login/avatar slot
+- [x] `/` — home: live games + recent games + recent tournaments (filled by M4/M8)
+- [x] `/engine` — list of all engines (M3)
+- [x] `/engine/{id}` — engine detail page (M3)
+- [x] `/engine/upload` — upload form (M6)
+- [x] `/game/{id}` — single-game viewer with board + clocks + move list (M2/M4)
+- [x] `/tournament` — list of all tournaments (M8)
+- [x] `/tournament/new` — create-tournament form (M8)
+- [x] `/tournament/{id}` — pairings + standings + live game link (M8)
+- [x] `/u/{login}` — user profile: their engines and recent games (M5)
+- [x] `/about` — short pitch + link to starter template (M7)
+- [x] 404 page
 
 ## M2 — Clocks & game state
 - [x] Send clocks in the `move` event from backend (already tracked in `game.py`, just include them)
@@ -62,16 +62,16 @@ The frontend is a single `App.tsx` today. Wire up routing and stub each page; la
 - [ ] Engine detail page with description and games played count
 
 ## M4 — Multi-game (break the singleton)
-- [ ] `Game` Beanie document: id, white_id, black_id, status, result, created_at, pgn
+- [x] `Game` Beanie document: id, white_id, black_id, status, result, created_at, pgn
 - [ ] One `GameStream` per game id (registry/dict keyed by game id)
-- [ ] `POST /game` returns a game id; current behaviour becomes "start and return id"
-- [ ] `GET /game/{id}` returns metadata + current FEN
+- [x] `POST /game` returns a game id; current behaviour becomes "start and return id"
+- [x] `GET /game/{id}` returns metadata + current FEN
 - [ ] `GET /sse/stream/{game_id}` instead of the global stream
-- [ ] `GET /game` lists recent games
-- [ ] Persist moves to the Game doc as they happen (append to `moves: list[str]`)
-- [ ] Persist final PGN on `game_end`
-- [ ] `/game/{id}` page on the frontend to watch any past or live game
-- [ ] Home page lists "live now" + "recent" games
+- [x] `GET /game` lists recent games
+- [x] Persist moves to the Game doc as they happen (append to `moves: list[str]`)
+- [x] Persist final PGN on `game_end`
+- [x] `/game/{id}` page on the frontend to watch any past or live game
+- [x] Home page lists "live now" + "recent" games
 - [ ] Only one live game at a time; further `POST /game` calls queue with `status=pending`
 - [ ] Worker promotes the next `pending` game to `running` when the current one finishes
 - [ ] `POST /game/{id}/cancel` to stop a running or pending game

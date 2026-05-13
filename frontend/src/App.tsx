@@ -1,384 +1,51 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Api } from '@lichess-org/chessground/api'
-import { Chessground } from './Chessground'
+import { BrowserRouter, Route, Routes } from 'react-router'
+import Layout from './Layout'
+import Home from './pages/Home'
+import GamePage from './pages/GamePage'
+import NotFound from './pages/NotFound'
+import { ParamStub, Stub } from './pages/Stub'
 
-const API_URL = import.meta.env.VITE_API_URL
-const SSE_URL = API_URL + '/sse/stream'
-
-type GameStatus = 'idle' | 'playing' | 'ended'
-
-type StreamEvent =
-  | {
-      type: 'fen'
-      fen: string
-      ply: number
-      white_name: string | null
-      black_name: string | null
-      moves: string[]
-      white_clock: number
-      black_clock: number
-      result: string | null
-      status: GameStatus
-    }
-  | {
-      type: 'move'
-      uci: string
-      san: string
-      from: string
-      to: string
-      fen: string
-      ply: number
-      white_clock: number
-      black_clock: number
-    }
-  | { type: 'game_start'; white_name: string | null; black_name: string | null }
-  | { type: 'game_end'; result: string }
-
-type Clocks = { white: number; black: number; updatedAt: number }
-
-function formatClock(s: number): string {
-  if (s >= 60) {
-    const m = Math.floor(s / 60)
-    const sec = Math.floor(s % 60)
-    return `${m}:${String(sec).padStart(2, '0')}`
-  }
-  return s.toFixed(1)
-}
-
-type Engine = {
-  id: string
-  name: string
-  command: string
-  description: string
-}
-
-const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
-
-const PIECE_NAMES: Record<string, string> = {
-  q: 'queen', r: 'rook', b: 'bishop', n: 'knight', p: 'pawn',
-}
-
-const PIECE_ORDER = ['q', 'r', 'b', 'n', 'p'] as const
-
-type CapturedPiece = { type: string; color: 'white' | 'black' }
-
-function captured(fen: string): { byWhite: CapturedPiece[]; byBlack: CapturedPiece[] } {
-  const board = fen.split(' ')[0]
-  const counts: Record<string, number> = {}
-  for (const ch of board) {
-    if (/[a-zA-Z]/.test(ch)) counts[ch] = (counts[ch] ?? 0) + 1
-  }
-  const start: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 }
-  const byWhite: CapturedPiece[] = []
-  const byBlack: CapturedPiece[] = []
-  for (const p of PIECE_ORDER) {
-    const whiteCaptured = Math.max(0, start[p] - (counts[p] ?? 0))
-    const blackCaptured = Math.max(0, start[p] - (counts[p.toUpperCase()] ?? 0))
-    const net = whiteCaptured - blackCaptured
-    if (net > 0) {
-      for (let i = 0; i < net; i++) byWhite.push({ type: PIECE_NAMES[p], color: 'black' })
-    } else if (net < 0) {
-      for (let i = 0; i < -net; i++) byBlack.push({ type: PIECE_NAMES[p], color: 'white' })
-    }
-  }
-  return { byWhite, byBlack }
-}
-
-function CapturedPieces({ pieces }: { pieces: CapturedPiece[] }) {
+export default function App() {
   return (
-    <span className="cg-wrap captured-pieces">
-      {pieces.map((p, i) => (
-        <piece key={i} className={`${p.type} ${p.color}`} />
-      ))}
-    </span>
-  )
-}
-
-function App() {
-  const apiRef = useRef<Api | null>(null)
-  const [status, setStatus] = useState('connecting')
-  const [ply, setPly] = useState<number | null>(null)
-  const [result, setResult] = useState<string | null>(null)
-  const [engines, setEngines] = useState<Engine[]>([])
-  const [whiteId, setWhiteId] = useState('')
-  const [blackId, setBlackId] = useState('')
-  const [starting, setStarting] = useState(false)
-  const [startError, setStartError] = useState<string | null>(null)
-  const [whiteName, setWhiteName] = useState<string | null>(null)
-  const [blackName, setBlackName] = useState<string | null>(null)
-  const [moves, setMoves] = useState<string[]>([])
-  const [fen, setFen] = useState<string>(START_FEN)
-  const [orientation, setOrientation] = useState<'white' | 'black'>('white')
-  const [clocks, setClocks] = useState<Clocks | null>(null)
-  const [gameStatus, setGameStatus] = useState<GameStatus>('idle')
-  const [now, setNow] = useState(() => Date.now())
-  const moveListRef = useRef<HTMLOListElement | null>(null)
-  const { byWhite, byBlack } = captured(fen)
-  const sideToMove: 'white' | 'black' = fen.split(' ')[1] === 'b' ? 'black' : 'white'
-  const isClockTicking = gameStatus === 'playing'
-  const showClocks = gameStatus !== 'idle' && clocks !== null
-  const elapsedSinceUpdate = clocks ? Math.max(0, (now - clocks.updatedAt) / 1000) : 0
-  const displayWhite = clocks
-    ? sideToMove === 'white' && isClockTicking
-      ? Math.max(0, clocks.white - elapsedSinceUpdate)
-      : clocks.white
-    : null
-  const displayBlack = clocks
-    ? sideToMove === 'black' && isClockTicking
-      ? Math.max(0, clocks.black - elapsedSinceUpdate)
-      : clocks.black
-    : null
-  const topIsBlack = orientation === 'white'
-  const topName = topIsBlack ? blackName : whiteName
-  const bottomName = topIsBlack ? whiteName : blackName
-  const topCaptured = topIsBlack ? byBlack : byWhite
-  const bottomCaptured = topIsBlack ? byWhite : byBlack
-  const topClock = topIsBlack ? displayBlack : displayWhite
-  const bottomClock = topIsBlack ? displayWhite : displayBlack
-  const topActive = isClockTicking && sideToMove === (topIsBlack ? 'black' : 'white')
-  const bottomActive = isClockTicking && sideToMove === (topIsBlack ? 'white' : 'black')
-
-  useEffect(() => {
-    fetch(API_URL + '/engine')
-      .then((r) => r.json())
-      .then((data: Engine[]) => {
-        setEngines(data)
-        if (data.length > 0) {
-          setWhiteId(data[0].id)
-          setBlackId(data[Math.min(1, data.length - 1)].id)
-        }
-      })
-      .catch(() => setStartError('failed to load engines'))
-  }, [])
-
-  useEffect(() => {
-    const es = new EventSource(SSE_URL)
-    es.onopen = () => setStatus('connected')
-    es.onerror = () => setStatus(es.readyState === EventSource.CLOSED ? 'disconnected' : 'error')
-    es.onmessage = (e) => {
-      const event: StreamEvent = JSON.parse(e.data)
-      const api = apiRef.current
-      if (!api) return
-
-      if (event.type === 'fen') {
-        api.set({ fen: event.fen })
-        setPly(event.ply)
-        setResult(event.result)
-        setWhiteName(event.white_name)
-        setBlackName(event.black_name)
-        setMoves(event.moves ?? [])
-        setFen(event.fen)
-        setClocks({ white: event.white_clock, black: event.black_clock, updatedAt: Date.now() })
-        setGameStatus(event.status)
-      } else if (event.type === 'move') {
-        api.set({
-          fen: event.fen,
-          lastMove: [event.from as never, event.to as never],
-        })
-        setPly(event.ply)
-        setMoves((prev) => [...prev, event.san])
-        setFen(event.fen)
-        setClocks({ white: event.white_clock, black: event.black_clock, updatedAt: Date.now() })
-      } else if (event.type === 'game_start') {
-        setResult(null)
-        setWhiteName(event.white_name)
-        setBlackName(event.black_name)
-        setMoves([])
-        setFen(START_FEN)
-        setClocks(null)
-        setGameStatus('playing')
-      } else if (event.type === 'game_end') {
-        setResult(event.result)
-        setGameStatus('ended')
-      }
-    }
-    return () => es.close()
-  }, [])
-
-  useEffect(() => {
-    const el = moveListRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [moves])
-
-  useEffect(() => {
-    if (!isClockTicking) return
-    const id = setInterval(() => setNow(Date.now()), 100)
-    return () => clearInterval(id)
-  }, [isClockTicking])
-
-  const startGame = async () => {
-    if (!whiteId || !blackId) return
-    setStarting(true)
-    setStartError(null)
-    try {
-      const r = await fetch(API_URL + '/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ white_engine_id: whiteId, black_engine_id: blackId }),
-      })
-      if (!r.ok) {
-        const t = await r.text()
-        setStartError(t || `error ${r.status}`)
-      }
-    } catch (e) {
-      setStartError(String(e))
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  return (
-    <main className="min-h-dvh flex flex-col items-center justify-center gap-4 sm:gap-6 px-4 py-6 bg-neutral-950 text-neutral-100">
-      <h1 className="text-2xl sm:text-3xl font-semibold">MachinePlay</h1>
-
-      <div className="flex flex-col gap-1.5 sm:grid sm:grid-cols-[auto_auto] sm:gap-x-3">
-        <div className="flex flex-wrap items-center gap-2 text-sm max-w-[var(--board-size)] sm:col-start-1 sm:row-start-1">
-          <span className="text-neutral-500 uppercase tracking-wide text-xs">
-            {topIsBlack ? 'black' : 'white'}
-          </span>
-          <span className="text-neutral-100 font-medium">{topName ?? '—'}</span>
-          <CapturedPieces pieces={topCaptured} />
-          {showClocks && topClock !== null && (
-            <span
-              className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
-                topActive
-                  ? 'bg-neutral-100 text-neutral-900'
-                  : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
-              }`}
-            >
-              {formatClock(topClock)}
-            </span>
-          )}
-        </div>
-        <div className="relative sm:col-start-1 sm:row-start-2">
-          <Chessground
-            config={{ viewOnly: true, coordinates: true, orientation }}
-            onReady={(api) => {
-              apiRef.current = api
-            }}
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Home />} />
+          <Route path="game/:id" element={<GamePage />} />
+          <Route path="engine" element={<Stub title="engines" />} />
+          <Route
+            path="engine/upload"
+            element={<Stub title="upload engine" />}
           />
-          <button
-            type="button"
-            onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
-            aria-label="flip board"
-            title="flip board"
-            className="absolute -top-2 -right-2 bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 rounded-full p-1.5 leading-none shadow"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M17 2l4 4-4 4" />
-              <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
-              <path d="M7 22l-4-4 4-4" />
-              <path d="M21 13v1a4 4 0 0 1-4 4H3" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm max-w-[var(--board-size)] sm:col-start-1 sm:row-start-3">
-          <span className="text-neutral-500 uppercase tracking-wide text-xs">
-            {topIsBlack ? 'white' : 'black'}
-          </span>
-          <span className="text-neutral-100 font-medium">{bottomName ?? '—'}</span>
-          <CapturedPieces pieces={bottomCaptured} />
-          {showClocks && bottomClock !== null && (
-            <span
-              className={`ml-auto font-mono tabular-nums px-1.5 py-0.5 rounded ${
-                bottomActive
-                  ? 'bg-neutral-100 text-neutral-900'
-                  : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
-              }`}
-            >
-              {formatClock(bottomClock)}
-            </span>
-          )}
-        </div>
-        <ol
-          ref={moveListRef}
-          className="bg-neutral-900 border border-neutral-800 rounded w-full h-32 sm:w-48 sm:h-[var(--board-size)] sm:col-start-2 sm:row-start-2 overflow-y-auto text-sm font-mono p-2 space-y-0.5"
-        >
-          {moves.length === 0 ? (
-            <li className="text-neutral-600 italic">no moves yet</li>
-          ) : (
-            Array.from({ length: Math.ceil(moves.length / 2) }, (_, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-neutral-500 w-6 shrink-0 text-right">{i + 1}.</span>
-                <span className="text-neutral-100 w-14 shrink-0">{moves[i * 2]}</span>
-                <span className="text-neutral-300">{moves[i * 2 + 1] ?? ''}</span>
-              </li>
-            ))
-          )}
-        </ol>
-        <div className="text-sm text-center sm:col-start-2 sm:row-start-3">
-          {gameStatus === 'ended' && result ? (
-            <span className="text-neutral-100 font-medium">{result}</span>
-          ) : gameStatus === 'playing' ? (
-            <span className="text-neutral-500 italic">playing</span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-center text-sm">
-        <label className="flex items-center gap-2">
-          <span className="text-neutral-400">white</span>
-          <select
-            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
-            value={whiteId}
-            onChange={(e) => setWhiteId(e.target.value)}
-          >
-            {engines.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-2">
-          <span className="text-neutral-400">black</span>
-          <select
-            className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1"
-            value={blackId}
-            onChange={(e) => setBlackId(e.target.value)}
-          >
-            {engines.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          onClick={startGame}
-          disabled={starting || engines.length === 0 || !whiteId || !blackId}
-          className="bg-neutral-100 text-neutral-900 rounded px-3 py-1 disabled:opacity-40"
-        >
-          {starting ? 'starting…' : 'start game'}
-        </button>
-      </div>
-
-      <div className="text-xs text-neutral-500 flex items-center gap-4">
-        <span
-          aria-label={status}
-          title={status}
-          className={`inline-block w-2 h-2 rounded-full ${
-            status === 'connected'
-              ? 'bg-green-500'
-              : status === 'connecting'
-                ? 'bg-amber-400'
-                : 'bg-red-500'
-          }`}
-        />
-        {ply !== null && <span>move {Math.ceil(ply / 2)}</span>}
-        {startError && <span className="text-red-400">{startError}</span>}
-      </div>
-    </main>
+          <Route
+            path="engine/:id"
+            element={<ParamStub title="engine" paramName="id" />}
+          />
+          <Route path="tournament" element={<Stub title="tournaments" />} />
+          <Route
+            path="tournament/new"
+            element={<Stub title="new tournament" />}
+          />
+          <Route
+            path="tournament/:id"
+            element={<ParamStub title="tournament" paramName="id" />}
+          />
+          <Route
+            path="u/:login"
+            element={<ParamStub title="user profile" paramName="login" />}
+          />
+          <Route
+            path="about"
+            element={
+              <Stub
+                title="about"
+                note="MachinePlay — engines play, you watch. More soon."
+              />
+            }
+          />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
-
-export default App
