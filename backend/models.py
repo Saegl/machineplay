@@ -1,19 +1,17 @@
 from datetime import datetime, timezone
-from typing import Literal
 from uuid import UUID, uuid4
 
 from beanie import Document
 from pydantic import Field
 
+from enums import GameStatus
+
 
 class Engine(Document):
-    id: UUID = Field(default_factory=uuid4)
+    id: UUID = Field(default_factory=uuid4)  # type: ignore[assignment]
     name: str
     command: str
     description: str = ""
-
-
-GameStatus = Literal["playing", "ended"]
 
 
 def utcnow() -> datetime:
@@ -21,12 +19,12 @@ def utcnow() -> datetime:
 
 
 class Game(Document):
-    id: UUID = Field(default_factory=uuid4)
+    id: UUID = Field(default_factory=uuid4)  # type: ignore[assignment]
     white_id: UUID
     black_id: UUID
     white_name: str
     black_name: str
-    status: GameStatus = "playing"
+    status: GameStatus = GameStatus.PLAYING
     result: str | None = None
     moves: list[str] = Field(default_factory=list)
     fen: str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

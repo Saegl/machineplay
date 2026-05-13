@@ -1,6 +1,7 @@
 import asyncio
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -12,7 +13,9 @@ from models import Engine
 
 
 async def main() -> None:
-    client = AsyncMongoClient(MONGO_URL)
+    # `dict[str, Any]` is pymongo's _DocumentType — shape of raw BSON results.
+    # Irrelevant here since all reads/writes go through beanie's ODM.
+    client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(MONGO_URL)
     try:
         await init_beanie(database=client[MONGO_DB], document_models=[Engine])
         existing = await Engine.find_one(Engine.name == "stockfish")

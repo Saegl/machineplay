@@ -6,6 +6,7 @@ import chess.engine
 import chess.pgn
 
 from config import TC, parse_tc
+from enums import GameStatus
 from models import Engine, Game, utcnow
 
 
@@ -22,7 +23,7 @@ class GameStream:
         self.san_moves: list[str] = []
         self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
         self.result: str | None = None
-        self.status: str = "idle"  # "idle" | "playing" | "ended"
+        self.status: str = "idle"  # "idle" | GameStatus
         self.game_doc: Game | None = None
 
     def snapshot(self) -> dict:
@@ -97,12 +98,12 @@ class GameStream:
         self.board.reset()
         self.san_moves = []
         self.result = None
-        self.status = "playing"
+        self.status = GameStatus.PLAYING
         base, inc = parse_tc(TC)
         self.clocks = {chess.WHITE: base, chess.BLACK: base}
         doc = self.game_doc
         if doc is not None:
-            doc.status = "playing"
+            doc.status = GameStatus.PLAYING
             doc.fen = self.board.fen()
             doc.white_clock = base
             doc.black_clock = base
@@ -170,10 +171,10 @@ class GameStream:
             await black.quit()
 
         self.result = self.board.result(claim_draw=True)
-        self.status = "ended"
+        self.status = GameStatus.ENDED
         logger.info("game ended result=%s plies=%d", self.result, self.board.ply())
         if doc is not None:
-            doc.status = "ended"
+            doc.status = GameStatus.ENDED
             doc.result = self.result
             doc.ended_at = utcnow()
             doc.pgn = self._build_pgn()
