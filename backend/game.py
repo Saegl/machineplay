@@ -8,6 +8,7 @@ import chess.pgn
 from config import TC, parse_tc
 from enums import GameStatus
 from models import Engine, Game, utcnow
+from schemas import FenEvent, GameEndEvent, GameStartEvent, MoveEvent, SSEEvent
 
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 class GameStream:
     def __init__(self) -> None:
         self.board = chess.Board()
-        self.subscribers: set[asyncio.Queue[dict]] = set()
+        self.subscribers: set[asyncio.Queue[SSEEvent]] = set()
         self._task: asyncio.Task | None = None
         self.white_name: str | None = None
         self.black_name: str | None = None
@@ -26,39 +27,38 @@ class GameStream:
         self.status: str = "idle"  # "idle" | GameStatus
         self.game_doc: Game | None = None
 
-    def snapshot(self) -> dict:
-        return {
-            "type": "fen",
-            "fen": self.board.fen(),
-            "ply": self.board.ply(),
-            "white_name": self.white_name,
-            "black_name": self.black_name,
-            "moves": list(self.san_moves),
-            "white_clock": self.clocks[chess.WHITE],
-            "black_clock": self.clocks[chess.BLACK],
-            "result": self.result,
-            "status": self.status,
-            "game_id": str(self.game_doc.id) if self.game_doc else None,
-        }
+    def snapshot(self) -> FenEvent:
+        return FenEvent(
+            fen=self.board.fen(),
+            ply=self.board.ply(),
+            white_name=self.white_name,
+            black_name=self.black_name,
+            moves=list(self.san_moves),
+            white_clock=self.clocks[chess.WHITE],
+            black_clock=self.clocks[chess.BLACK],
+            result=self.result,
+            status=self.status,
+            game_id=str(self.game_doc.id) if self.game_doc else None,
+        )
 
-    def subscribe(self) -> asyncio.Queue[dict]:
-        q: asyncio.Queue[dict] = asyncio.Queue(maxsize=256)
+    def subscribe(self) -> asyncio.Queue[SSEEvent]:
+        q: asyncio.Queue[SSEEvent] = asyncio.Queue(maxsize=256)
         q.put_nowait(self.snapshot())
         self.subscribers.add(q)
         logger.info("subscriber added, total=%d", len(self.subscribers))
         return q
 
-    def unsubscribe(self, q: asyncio.Queue[dict]) -> None:
+    def unsubscribe(self, q: asyncio.Queue[SSEEvent]) -> None:
         self.subscribers.discard(q)
         logger.info("subscriber removed, total=%d", len(self.subscribers))
 
-    def _broadcast(self, event: dict) -> None:
+    def _broadcast(self, event: SSEEvent) -> None:
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
             except asyncio.QueueFull:
                 logger.warning(
-                    "subscriber queue full, dropping event type=%s", event.get("type")
+                    "subscriber queue full, dropping event type=%s", event.type
                 )
 
     def _build_pgn(self) -> str:
@@ -109,12 +109,11 @@ class GameStream:
             doc.black_clock = base
             await doc.save()
         self._broadcast(
-            {
-                "type": "game_start",
-                "white_name": self.white_name,
-                "black_name": self.black_name,
-                "game_id": str(doc.id) if doc else None,
-            }
+            GameStartEvent(
+                white_name=self.white_name,
+                black_name=self.black_name,
+                game_id=str(doc.id) if doc else None,
+            )
         )
         self._broadcast(self.snapshot())
 
@@ -154,17 +153,16 @@ class GameStream:
                     doc.black_clock = self.clocks[chess.BLACK]
                     await doc.save()
                 self._broadcast(
-                    {
-                        "type": "move",
-                        "uci": uci,
-                        "san": san,
-                        "from": uci[:2],
-                        "to": uci[2:4],
-                        "fen": self.board.fen(),
-                        "ply": self.board.ply(),
-                        "white_clock": self.clocks[chess.WHITE],
-                        "black_clock": self.clocks[chess.BLACK],
-                    }
+                    MoveEvent(
+                        uci=uci,
+                        san=san,
+                        from_square=uci[:2],
+                        to_square=uci[2:4],
+                        fen=self.board.fen(),
+                        ply=self.board.ply(),
+                        white_clock=self.clocks[chess.WHITE],
+                        black_clock=self.clocks[chess.BLACK],
+                    )
                 )
         finally:
             await white.quit()
@@ -183,7 +181,7 @@ class GameStream:
             doc.white_clock = self.clocks[chess.WHITE]
             doc.black_clock = self.clocks[chess.BLACK]
             await doc.save()
-        self._broadcast({"type": "game_end", "result": self.result})
+        self._broadcast(GameEndEvent(result=self.result))
 
 
 stream = GameStream()

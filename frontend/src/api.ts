@@ -50,8 +50,8 @@ export type StreamEvent =
       type: 'move'
       uci: string
       san: string
-      from: string
-      to: string
+      from_square: string
+      to_square: string
       fen: string
       ply: number
       white_clock: number

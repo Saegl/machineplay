@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Any, AsyncIterable
+from typing import AsyncIterable
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
@@ -8,7 +8,13 @@ from fastapi.sse import EventSourceResponse
 
 from game import stream
 from models import Engine, Game
-from schemas import EngineOut, GameOut, StartGameRequest, StartGameResponse
+from schemas import (
+    EngineOut,
+    GameOut,
+    SSEEvent,
+    StartGameRequest,
+    StartGameResponse,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -50,7 +56,7 @@ async def get_game(game_id: UUID) -> Game:
 
 
 @router.get("/sse/stream", response_class=EventSourceResponse)
-async def sse_stream() -> AsyncIterable[dict[str, Any]]:
+async def sse_stream() -> AsyncIterable[SSEEvent]:
     q = stream.subscribe()
     try:
         while True:
