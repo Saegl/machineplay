@@ -6,9 +6,10 @@ import type { Config } from '@lichess-org/chessground/config'
 type Props = {
   config?: Config
   onReady?: (api: Api) => void
+  className?: string
 }
 
-export function Chessground({ config, onReady }: Props) {
+export function Chessground({ config, onReady, className }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const apiRef = useRef<Api | null>(null)
 
@@ -24,5 +25,10 @@ export function Chessground({ config, onReady }: Props) {
     apiRef.current?.set(config ?? {})
   }, [config])
 
-  return <div ref={ref} className="cg-wrap" />
+  return (
+    <div
+      ref={ref}
+      className={className ? `cg-wrap ${className}` : 'cg-wrap'}
+    />
+  )
 }

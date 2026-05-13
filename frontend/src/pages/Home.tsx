@@ -1,6 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { API_URL, type Engine, type Game } from '../api'
+import { Chessground } from '../Chessground'
+import {
+  API_URL,
+  SSE_URL,
+  type Engine,
+  type Game,
+  type StreamEvent,
+} from '../api'
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime()
@@ -14,7 +21,39 @@ function relativeTime(iso: string): string {
   return `${d}d ago`
 }
 
-function GameRow({ game }: { game: Game }) {
+function LiveGameCard({ game }: { game: Game }) {
+  const moveNo = Math.max(1, Math.ceil(game.moves.length / 2))
+  return (
+    <Link
+      to={`/game/${game.id}`}
+      className="group flex flex-col gap-2 rounded-lg border border-neutral-800 hover:border-neutral-600 bg-neutral-900/60 p-3 transition-colors"
+    >
+      <Chessground
+        className="!w-full"
+        config={{
+          fen: game.fen,
+          viewOnly: true,
+          coordinates: false,
+          drawable: { enabled: false },
+        }}
+      />
+      <div className="flex items-center gap-2 text-sm">
+        <span className="font-medium truncate">{game.white_name}</span>
+        <span className="text-neutral-500">vs</span>
+        <span className="font-medium truncate">{game.black_name}</span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-neutral-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+          live
+        </span>
+        <span className="ml-auto">move {moveNo}</span>
+      </div>
+    </Link>
+  )
+}
+
+function RecentGameRow({ game }: { game: Game }) {
   return (
     <Link
       to={`/game/${game.id}`}
@@ -25,13 +64,11 @@ function GameRow({ game }: { game: Game }) {
         <span className="text-neutral-500">vs</span>
         <span className="font-medium">{game.black_name}</span>
         <span className="ml-auto font-mono text-xs text-neutral-400">
-          {game.status === 'ended'
-            ? (game.result ?? '*')
-            : `${Math.ceil(game.moves.length / 2)} moves`}
+          {game.result ?? '*'}
         </span>
       </div>
       <div className="text-xs text-neutral-500 mt-0.5">
-        {game.status === 'ended' && game.ended_at
+        {game.ended_at
           ? relativeTime(game.ended_at)
           : relativeTime(game.created_at)}
       </div>
@@ -48,6 +85,7 @@ export default function Home() {
   const [startError, setStartError] = useState<string | null>(null)
   const [games, setGames] = useState<Game[] | null>(null)
   const [gamesError, setGamesError] = useState<string | null>(null)
+  const liveGameIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/engine`)
@@ -75,6 +113,84 @@ export default function Home() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  useEffect(() => {
+    const es = new EventSource(SSE_URL)
+    es.onmessage = (e) => {
+      const event: StreamEvent = JSON.parse(e.data)
+
+      if (event.type === 'fen') {
+        liveGameIdRef.current = event.game_id
+        if (!event.game_id || event.status === 'idle') return
+        const gameId = event.game_id
+        setGames((prev) => {
+          if (!prev) return prev
+          const idx = prev.findIndex((g) => g.id === gameId)
+          if (idx < 0) return prev
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            fen: event.fen,
+            moves: event.moves,
+            status: event.status === 'ended' ? 'ended' : 'playing',
+            result: event.result,
+            white_clock: event.white_clock,
+            black_clock: event.black_clock,
+          }
+          return next
+        })
+      } else if (event.type === 'game_start') {
+        liveGameIdRef.current = event.game_id
+        if (!event.game_id) return
+        const newId = event.game_id
+        fetch(`${API_URL}/game/${newId}`)
+          .then((r) => (r.ok ? (r.json() as Promise<Game>) : null))
+          .then((g) => {
+            if (!g) return
+            setGames((prev) => {
+              if (!prev) return [g]
+              if (prev.some((x) => x.id === g.id)) return prev
+              return [g, ...prev]
+            })
+          })
+          .catch(() => {})
+      } else if (event.type === 'move') {
+        const gameId = liveGameIdRef.current
+        if (!gameId) return
+        setGames((prev) => {
+          if (!prev) return prev
+          const idx = prev.findIndex((g) => g.id === gameId)
+          if (idx < 0) return prev
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            fen: event.fen,
+            moves: [...prev[idx].moves, event.san],
+            white_clock: event.white_clock,
+            black_clock: event.black_clock,
+          }
+          return next
+        })
+      } else if (event.type === 'game_end') {
+        const gameId = liveGameIdRef.current
+        if (!gameId) return
+        setGames((prev) => {
+          if (!prev) return prev
+          const idx = prev.findIndex((g) => g.id === gameId)
+          if (idx < 0) return prev
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            status: 'ended',
+            result: event.result,
+            ended_at: new Date().toISOString(),
+          }
+          return next
+        })
+      }
+    }
+    return () => es.close()
   }, [])
 
   const startGame = async () => {
@@ -169,9 +285,9 @@ export default function Home() {
         ) : live.length === 0 ? (
           <p className="text-neutral-500 text-sm italic">no live games</p>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {live.map((g) => (
-              <GameRow key={g.id} game={g} />
+              <LiveGameCard key={g.id} game={g} />
             ))}
           </div>
         )}
@@ -190,7 +306,7 @@ export default function Home() {
         ) : (
           <div className="flex flex-col gap-2">
             {recent.map((g) => (
-              <GameRow key={g.id} game={g} />
+              <RecentGameRow key={g.id} game={g} />
             ))}
           </div>
         )}
