@@ -3,7 +3,7 @@ import logging
 from typing import AsyncIterable
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, WebSocket
 from fastapi.sse import EventSourceResponse
 
 from game import stream
@@ -15,7 +15,6 @@ from schemas import (
     StartGameRequest,
     StartGameResponse,
 )
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -53,6 +52,24 @@ async def get_game(game_id: UUID) -> Game:
     if doc is None:
         raise HTTPException(status_code=404, detail="game not found")
     return doc
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket) -> None:
+    from machineplay import schemas
+
+    await websocket.accept()
+
+    intro = await websocket.receive_text()
+    print("intro", intro)
+
+    message = schemas.StartGame()
+    await websocket.send_text(message.model_dump_json())
+
+    message = schemas.Terminate()
+    await websocket.send_text(message.model_dump_json())
+
+    await websocket.close()
 
 
 @router.get("/sse/stream", response_class=EventSourceResponse)

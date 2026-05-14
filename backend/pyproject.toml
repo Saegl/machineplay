@@ -1,5 +1,5 @@
 [project]
-name = "machineplay"
+name = "backend"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,7 +8,11 @@ dependencies = [
     "fastapi[standard]>=0.136.1",
     "beanie>=2.1.0",
     "chess>=1.11.2",
+    "machineplay",
 ]
+
+[tool.uv.sources]
+machineplay = { path = "../machineplay", editable = true }
 
 [dependency-groups]
 dev = [

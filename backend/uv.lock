@@ -76,6 +76,45 @@ wheels = [
 ]
 
 [[package]]
+name = "backend"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "beanie" },
+    { name = "chess" },
+    { name = "fastapi", extra = ["standard"] },
+    { name = "machineplay" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "testcontainers", extra = ["mongodb"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beanie", specifier = ">=2.1.0" },
+    { name = "chess", specifier = ">=1.11.2" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.136.1" },
+    { name = "machineplay", editable = "../machineplay" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=2.1.0" },
+    { name = "pre-commit", specifier = ">=4.6.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "testcontainers", extras = ["mongodb"], specifier = ">=4.14.2" },
+]
+
+[[package]]
 name = "beanie"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -600,38 +639,18 @@ wheels = [
 [[package]]
 name = "machineplay"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "../machineplay" }
 dependencies = [
-    { name = "beanie" },
     { name = "chess" },
-    { name = "fastapi", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "testcontainers", extra = ["mongodb"] },
+    { name = "pydantic" },
+    { name = "websockets" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "beanie", specifier = ">=2.1.0" },
     { name = "chess", specifier = ">=1.11.2" },
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.136.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mypy", specifier = ">=2.1.0" },
-    { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "pytest", specifier = ">=9.0.3" },
-    { name = "pytest-asyncio", specifier = ">=1.3.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "testcontainers", extras = ["mongodb"], specifier = ">=4.14.2" },
+    { name = "pydantic", specifier = ">=2.13.4" },
+    { name = "websockets", specifier = ">=16.0" },
 ]
 
 [[package]]
