@@ -1,6 +1,10 @@
 import asyncio
 import os
+import socket
+import ssl
 from uuid import UUID, uuid4
+
+import certifi
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosedError
 from machineplay import schemas
@@ -134,8 +138,13 @@ class Game:
 
 async def connect_backend_ws():
     print(f"connecting to {BACKEND_URL}")
-    async with connect(BACKEND_URL) as ws:
-        intro = schemas.Introduction(runner_id=RUNNER_ID, name="frostmourne")
+    ssl_ctx = (
+        ssl.create_default_context(cafile=certifi.where())
+        if BACKEND_URL.startswith("wss://")
+        else None
+    )
+    async with connect(BACKEND_URL, ssl=ssl_ctx) as ws:
+        intro = schemas.Introduction(runner_id=RUNNER_ID, name=socket.gethostname())
         await ws.send(intro.model_dump_json())
 
         scheduled_commands: asyncio.Queue[schemas.ClientCommand] = asyncio.Queue()

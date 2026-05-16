@@ -641,6 +641,7 @@ name = "machineplay"
 version = "0.1.0"
 source = { editable = "../machineplay" }
 dependencies = [
+    { name = "certifi" },
     { name = "chess" },
     { name = "pydantic" },
     { name = "websockets" },
@@ -648,6 +649,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "certifi", specifier = ">=2026.4.22" },
     { name = "chess", specifier = ">=1.11.2" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "websockets", specifier = ">=16.0" },
