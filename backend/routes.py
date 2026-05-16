@@ -13,6 +13,7 @@ from models import Engine, Game
 from schemas import (
     EngineOut,
     GameOut,
+    LiveStreamEvent,
     RunnerOut,
     StartGameRequest,
     StartGameResponse,
@@ -120,11 +121,12 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                     except NotFoundError:
                         logger.warning("event for unregistered game_id=%s", game_id)
                         continue
-                    await game.broadcast(event)
-                    await streaming.persist_event(game_id, event)
                     if isinstance(event, schemas.GameEndEvent):
                         runner.untrack_game(game_id)
                         streaming.game_registry.registry.pop(game_id, None)
+                    await streaming.persist_event(game_id, event)
+                    await game.broadcast(event)
+                    await streaming.live_stream.broadcast(game_id, event)
 
     async def sender() -> None:
         while True:
@@ -163,3 +165,14 @@ async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.SSEEvent]:
         raise
     finally:
         game.unsubscribe(q)
+
+
+@router.get("/stream/live", response_class=EventSourceResponse)
+async def sse_live_stream() -> AsyncIterable[LiveStreamEvent]:
+    q = streaming.live_stream.subscribe()
+    try:
+        while True:
+            game_id, event = await q.get()
+            yield LiveStreamEvent(game_id=game_id, event=event)
+    finally:
+        streaming.live_stream.unsubscribe(q)

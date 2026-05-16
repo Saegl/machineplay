@@ -22,7 +22,9 @@ async def abort_game(game_id: UUID) -> None:
 
     game = game_registry.registry.pop(game_id, None)
     if game is not None:
-        await game.broadcast(schemas.GameEndEvent(result="*", pgn=None))
+        end_event = schemas.GameEndEvent(result="*", pgn=None)
+        await game.broadcast(end_event)
+        await live_stream.broadcast(game_id, end_event)
 
 
 async def abort_orphan_games() -> None:
@@ -97,6 +99,82 @@ class Game:
                 )
 
 
+class LiveStream:
+    """Broadcasts events from up to LIMIT live games to all subscribers.
+
+    Maintains a system-wide set of tracked game ids: events for tracked
+    games fan out to every subscriber, others are dropped. When a tracked
+    game ends, its slot is filled by another currently-playing game (if any)
+    and a synthetic FenEvent is emitted so subscribers can bootstrap it.
+    """
+
+    LIMIT = 8
+
+    def __init__(self) -> None:
+        self.subscribers: set[asyncio.Queue[tuple[UUID, schemas.SSEEvent]]] = set()
+        self.tracked: set[UUID] = set()
+
+    def subscribe(self) -> asyncio.Queue[tuple[UUID, schemas.SSEEvent]]:
+        q: asyncio.Queue[tuple[UUID, schemas.SSEEvent]] = asyncio.Queue(maxsize=512)
+        self.subscribers.add(q)
+        logger.info("live stream subscriber added, total=%d", len(self.subscribers))
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue[tuple[UUID, schemas.SSEEvent]]) -> None:
+        self.subscribers.discard(q)
+        logger.info("live stream subscriber removed, total=%d", len(self.subscribers))
+
+    async def broadcast(self, game_id: UUID, event: schemas.SSEEvent) -> None:
+        if game_id in self.tracked:
+            self._fanout(game_id, event)
+            if isinstance(event, schemas.GameEndEvent):
+                self.tracked.discard(game_id)
+                await self._promote()
+        elif (
+            isinstance(event, schemas.GameStartEvent) and len(self.tracked) < self.LIMIT
+        ):
+            self.tracked.add(game_id)
+            self._fanout(game_id, event)
+        elif isinstance(event, schemas.GameEndEvent):
+            # Untracked game ended — still forward so any subscriber that knows
+            # about it (e.g. via the initial /game fetch) can mark it ended.
+            self._fanout(game_id, event)
+
+    async def _promote(self) -> None:
+        for gid in list(game_registry.registry.keys()):
+            if gid in self.tracked:
+                continue
+            doc = await GameDoc.get(gid)
+            if doc is None or doc.status != GameStatus.PLAYING:
+                continue
+            self.tracked.add(gid)
+            self._fanout(
+                gid,
+                schemas.FenEvent(
+                    fen=doc.fen,
+                    ply=len(doc.moves),
+                    white_name=doc.white_name,
+                    black_name=doc.black_name,
+                    moves=doc.moves,
+                    white_clock=doc.white_clock,
+                    black_clock=doc.black_clock,
+                    result=doc.result,
+                    status=schemas.StreamStatus.PLAYING,
+                    game_id=gid,
+                ),
+            )
+            return
+
+    def _fanout(self, game_id: UUID, event: schemas.SSEEvent) -> None:
+        for q in self.subscribers:
+            try:
+                q.put_nowait((game_id, event))
+            except asyncio.QueueFull:
+                logger.warning(
+                    "live stream queue full, dropping event type=%s", event.type
+                )
+
+
 class GameRegistry:
     def __init__(self) -> None:
         self.registry: dict[UUID, Game] = {}
@@ -168,4 +246,5 @@ class Runners:
 
 
 game_registry = GameRegistry()
+live_stream = LiveStream()
 runners = Runners()

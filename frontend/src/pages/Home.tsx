@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Chessground } from '../Chessground'
-import { API_URL, type Engine, type Game, type Runner } from '../api'
+import {
+  API_URL,
+  liveStreamUrl,
+  START_FEN,
+  type Engine,
+  type Game,
+  type LiveStreamEvent,
+  type Runner,
+} from '../api'
+
+const LIVE_DISPLAY_LIMIT = 8
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime()
@@ -120,6 +130,106 @@ export default function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    const es = new EventSource(liveStreamUrl())
+    es.onmessage = (e) => {
+      const { game_id, event }: LiveStreamEvent = JSON.parse(e.data)
+      setGames((prev) => {
+        if (!prev) return prev
+        const idx = prev.findIndex((g) => g.id === game_id)
+        if (event.type === 'game_start') {
+          if (idx < 0) {
+            const fresh: Game = {
+              id: game_id,
+              white_id: '',
+              black_id: '',
+              white_name: event.white_name ?? '',
+              black_name: event.black_name ?? '',
+              status: 'playing',
+              result: null,
+              moves: [],
+              fen: START_FEN,
+              pgn: null,
+              white_clock: 0,
+              black_clock: 0,
+              created_at: new Date().toISOString(),
+              ended_at: null,
+            }
+            return [fresh, ...prev]
+          }
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            white_name: event.white_name ?? prev[idx].white_name,
+            black_name: event.black_name ?? prev[idx].black_name,
+            status: 'playing',
+            result: null,
+            ended_at: null,
+          }
+          return next
+        }
+        if (event.type === 'fen') {
+          const merged: Game = idx < 0
+            ? {
+                id: game_id,
+                white_id: '',
+                black_id: '',
+                white_name: event.white_name ?? '',
+                black_name: event.black_name ?? '',
+                status: event.status === 'ended' ? 'ended' : 'playing',
+                result: event.result,
+                moves: event.moves,
+                fen: event.fen,
+                pgn: null,
+                white_clock: event.white_clock,
+                black_clock: event.black_clock,
+                created_at: new Date().toISOString(),
+                ended_at: null,
+              }
+            : {
+                ...prev[idx],
+                white_name: event.white_name ?? prev[idx].white_name,
+                black_name: event.black_name ?? prev[idx].black_name,
+                fen: event.fen,
+                moves: event.moves,
+                status: event.status === 'ended' ? 'ended' : 'playing',
+                result: event.result,
+                white_clock: event.white_clock,
+                black_clock: event.black_clock,
+              }
+          if (idx < 0) return [merged, ...prev]
+          const next = [...prev]
+          next[idx] = merged
+          return next
+        }
+        if (idx < 0) return prev
+        if (event.type === 'move') {
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            fen: event.fen,
+            moves: [...prev[idx].moves, event.san],
+            white_clock: event.white_clock,
+            black_clock: event.black_clock,
+          }
+          return next
+        }
+        if (event.type === 'game_end') {
+          const next = [...prev]
+          next[idx] = {
+            ...prev[idx],
+            status: 'ended',
+            result: event.result,
+            ended_at: new Date().toISOString(),
+          }
+          return next
+        }
+        return prev
+      })
+    }
+    return () => es.close()
+  }, [])
+
   const startGame = async () => {
     if (!whiteId || !blackId || !runnerId) return
     setStarting(true)
@@ -148,7 +258,8 @@ export default function Home() {
     }
   }
 
-  const live = (games ?? []).filter((g) => g.status === 'playing')
+  const allLive = (games ?? []).filter((g) => g.status === 'playing')
+  const live = allLive.slice(0, LIVE_DISPLAY_LIMIT)
   const recent = (games ?? []).filter((g) => g.status === 'ended').slice(0, 20)
 
   return (
@@ -227,9 +338,9 @@ export default function Home() {
       <section className="flex flex-col gap-3">
         <h2 className="text-sm uppercase tracking-wide text-neutral-500">
           live
-          {live.length > 0 && (
+          {allLive.length > 0 && (
             <span className="ml-2 text-neutral-400 normal-case">
-              ({live.length})
+              ({allLive.length})
             </span>
           )}
         </h2>

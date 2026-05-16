@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from enums import GameStatus
+from machineplay.schemas import SSEEvent
 
 
 class StartGameRequest(BaseModel):
@@ -33,6 +34,11 @@ class EngineOut(BaseModel):
     name: str
     command: str
     description: str
+
+
+class LiveStreamEvent(BaseModel):
+    game_id: UUID
+    event: SSEEvent
 
 
 class GameOut(BaseModel):

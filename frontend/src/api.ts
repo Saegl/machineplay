@@ -1,6 +1,7 @@
 export const API_URL = import.meta.env.VITE_API_URL as string
 export const gameStreamUrl = (gameId: string): string =>
   `${API_URL}/stream/game/${gameId}`
+export const liveStreamUrl = (): string => `${API_URL}/stream/live`
 
 export const START_FEN =
   'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -70,3 +71,8 @@ export type StreamEvent =
       game_id: string | null
     }
   | { type: 'game_end'; result: string }
+
+export type LiveStreamEvent = {
+  game_id: string
+  event: StreamEvent
+}
