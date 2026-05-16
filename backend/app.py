@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import db
+import streaming
 from exceptions import AppException
 from routes import router
 
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     client = await db.connect()
+    await streaming.abort_orphan_games()
     try:
         yield
     finally:

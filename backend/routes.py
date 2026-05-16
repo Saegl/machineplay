@@ -51,6 +51,7 @@ async def start_game(payload: StartGameRequest) -> StartGameResponse:
     await doc.insert()
 
     streaming.game_registry.register_game(doc.id)
+    runner.track_game(doc.id)
 
     await runner.scheduled_commands.put(
         schemas.StartGame(
@@ -105,6 +106,9 @@ async def websocket_endpoint(ws: WebSocket) -> None:
                         continue
                     await game.broadcast(event)
                     await streaming.persist_event(game_id, event)
+                    if isinstance(event, schemas.GameEndEvent):
+                        runner.untrack_game(game_id)
+                        streaming.game_registry.registry.pop(game_id, None)
 
     async def sender() -> None:
         while True:
@@ -126,6 +130,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     finally:
         recv_task.cancel()
         send_task.cancel()
+        await runner.abort_games()
         streaming.runners.unregister_runner(intro.runner_id)
 
 

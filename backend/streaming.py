@@ -10,6 +10,33 @@ from models import Game as GameDoc, utcnow
 logger = logging.getLogger(__name__)
 
 
+async def abort_game(game_id: UUID) -> None:
+    """Mark a playing game as aborted in DB and notify subscribers."""
+    doc = await GameDoc.get(game_id)
+    if doc is not None and doc.status == GameStatus.PLAYING:
+        doc.status = GameStatus.ABORTED
+        doc.result = "*"
+        doc.ended_at = utcnow()
+        await doc.save()
+        logger.info("aborted game=%s", game_id)
+
+    game = game_registry.registry.pop(game_id, None)
+    if game is not None:
+        await game.broadcast(schemas.GameEndEvent(result="*", pgn=None))
+
+
+async def abort_orphan_games() -> None:
+    """Mark any DB games still in PLAYING as aborted (e.g. after backend restart)."""
+    orphans = await GameDoc.find(GameDoc.status == GameStatus.PLAYING).to_list()
+    for doc in orphans:
+        doc.status = GameStatus.ABORTED
+        doc.result = "*"
+        doc.ended_at = utcnow()
+        await doc.save()
+    if orphans:
+        logger.info("aborted %d orphan game(s) on startup", len(orphans))
+
+
 async def persist_event(game_id: UUID, event: schemas.SSEEvent) -> None:
     doc = await GameDoc.get(game_id)
     if doc is None:
@@ -93,6 +120,18 @@ class Runner:
         self.runner_id = runner_id
         self.name = name
         self.scheduled_commands: asyncio.Queue[schemas.ServerCommand] = asyncio.Queue()
+        self._game_ids: set[UUID] = set()
+
+    def track_game(self, game_id: UUID) -> None:
+        self._game_ids.add(game_id)
+
+    def untrack_game(self, game_id: UUID) -> None:
+        self._game_ids.discard(game_id)
+
+    async def abort_games(self) -> None:
+        for game_id in list(self._game_ids):
+            await abort_game(game_id)
+        self._game_ids.clear()
 
 
 class NoRunnerAvailable(AppException):

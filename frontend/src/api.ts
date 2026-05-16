@@ -17,7 +17,7 @@ export type Runner = {
   name: string
 }
 
-export type GameStatus = 'playing' | 'ended'
+export type GameStatus = 'playing' | 'ended' | 'aborted'
 
 export type Game = {
   id: string
@@ -36,7 +36,7 @@ export type Game = {
   ended_at: string | null
 }
 
-export type StreamStatus = 'idle' | 'playing' | 'ended'
+export type StreamStatus = 'idle' | 'playing' | 'ended' | 'aborted'
 
 export type StreamEvent =
   | {
