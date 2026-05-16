@@ -4,7 +4,7 @@ from uuid import UUID
 
 from machineplay import schemas
 from enums import GameStatus
-from exceptions import AppException, NotFoundError
+from exceptions import NotFoundError
 from models import Game as GameDoc, utcnow
 
 logger = logging.getLogger(__name__)
@@ -132,12 +132,6 @@ class Runner:
         for game_id in list(self._game_ids):
             await abort_game(game_id)
         self._game_ids.clear()
-
-
-class NoRunnerAvailable(AppException):
-    status_code = 503
-    code = "no_runner"
-    message = "no runner is connected"
 
 
 class Runners:
