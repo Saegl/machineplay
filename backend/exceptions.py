@@ -17,3 +17,9 @@ class NotFoundError(AppException):
     status_code = 404
     code = "not_found"
     message = "Resource not found"
+
+
+class RunnerBusyError(AppException):
+    status_code = 503
+    code = "runner_busy"
+    message = "Runner is at capacity"

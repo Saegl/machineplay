@@ -86,6 +86,7 @@ class Introduction(BaseModel):
     cmd: Literal["intro"] = "intro"
     runner_id: UUID
     name: str
+    max_games: int
 
 
 class GameEvent(BaseModel):

@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.sse import EventSourceResponse
 
 from config import TC
-from exceptions import NotFoundError
+from exceptions import NotFoundError, RunnerBusyError
 from machineplay import schemas
 from models import Engine, Game
 from schemas import (
@@ -41,6 +41,15 @@ async def start_game(payload: StartGameRequest) -> StartGameResponse:
         raise NotFoundError("engine not found")
 
     runner = streaming.runners.get_runner(payload.runner_id)
+
+    if runner.is_full():
+        raise RunnerBusyError(
+            details={
+                "runner_id": str(runner.runner_id),
+                "active_games": runner.active_games,
+                "max_games": runner.max_games,
+            }
+        )
 
     doc = Game(
         white_id=white.id,
@@ -90,8 +99,15 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
 
     intro = schemas.Introduction.model_validate_json(await ws.receive_text())
-    runner = streaming.runners.register_runner(intro.runner_id, intro.name)
-    logger.info("runner connected id=%s name=%s", intro.runner_id, intro.name)
+    runner = streaming.runners.register_runner(
+        intro.runner_id, intro.name, max_games=intro.max_games
+    )
+    logger.info(
+        "runner connected id=%s name=%s max_games=%d",
+        intro.runner_id,
+        intro.name,
+        intro.max_games,
+    )
 
     async def receiver() -> None:
         while True:

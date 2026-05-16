@@ -116,11 +116,19 @@ class GameRegistry:
 
 
 class Runner:
-    def __init__(self, runner_id: UUID, name: str):
+    def __init__(self, runner_id: UUID, name: str, max_games: int):
         self.runner_id = runner_id
         self.name = name
+        self.max_games = max_games
         self.scheduled_commands: asyncio.Queue[schemas.ServerCommand] = asyncio.Queue()
         self._game_ids: set[UUID] = set()
+
+    @property
+    def active_games(self) -> int:
+        return len(self._game_ids)
+
+    def is_full(self) -> bool:
+        return len(self._game_ids) >= self.max_games
 
     def track_game(self, game_id: UUID) -> None:
         self._game_ids.add(game_id)
@@ -138,8 +146,8 @@ class Runners:
     def __init__(self) -> None:
         self.data: dict[UUID, Runner] = {}
 
-    def register_runner(self, runner_id: UUID, name: str) -> Runner:
-        new_runner = Runner(runner_id, name)
+    def register_runner(self, runner_id: UUID, name: str, max_games: int) -> Runner:
+        new_runner = Runner(runner_id, name, max_games=max_games)
         self.data[runner_id] = new_runner
         return new_runner
 

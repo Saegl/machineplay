@@ -15,6 +15,7 @@ import chess.pgn
 
 RUNNER_ID = uuid4()
 BACKEND_URL = os.environ.get("BACKEND_URL", "wss://api.machineplay.org/ws")
+MAX_GAMES = int(os.environ.get("MAX_GAMES") or (os.cpu_count() or 1))
 
 
 def parse_tc(spec: str) -> tuple[float, float]:
@@ -144,7 +145,9 @@ async def connect_backend_ws():
         else None
     )
     async with connect(BACKEND_URL, ssl=ssl_ctx) as ws:
-        intro = schemas.Introduction(runner_id=RUNNER_ID, name=socket.gethostname())
+        intro = schemas.Introduction(
+            runner_id=RUNNER_ID, name=socket.gethostname(), max_games=MAX_GAMES
+        )
         await ws.send(intro.model_dump_json())
 
         scheduled_commands: asyncio.Queue[schemas.ClientCommand] = asyncio.Queue()
@@ -161,9 +164,23 @@ async def connect_backend_ws():
                     case schemas.StartGame(
                         game_id=game_id, white=white, black=black, tc=tc
                     ):
+                        if len(games) >= MAX_GAMES:
+                            print(
+                                f"refusing start_game {game_id}: at capacity "
+                                f"({len(games)}/{MAX_GAMES})"
+                            )
+                            await scheduled_commands.put(
+                                schemas.GameEvent(
+                                    game_id=game_id,
+                                    event=schemas.GameEndEvent(result="*", pgn=None),
+                                )
+                            )
+                            continue
                         print(f"start_game {game_id} {white.name} vs {black.name}")
-                        games[game_id] = Game(
-                            game_id, white, black, tc, scheduled_commands
+                        game = Game(game_id, white, black, tc, scheduled_commands)
+                        games[game_id] = game
+                        game.task.add_done_callback(
+                            lambda _t, gid=game_id: games.pop(gid, None)
                         )
                     case schemas.StopGame():
                         print("stop_game")
