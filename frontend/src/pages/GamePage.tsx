@@ -5,7 +5,7 @@ import { Chess } from 'chess.js'
 import { Chessground } from '../Chessground'
 import {
   API_URL,
-  SSE_URL,
+  gameStreamUrl,
   type Game,
   type StreamEvent,
   type StreamStatus,
@@ -90,7 +90,6 @@ function replay(moves: string[], ply: number) {
 export default function GamePage() {
   const { id } = useParams<{ id: string }>()
   const apiRef = useRef<Api | null>(null)
-  const liveGameIdRef = useRef<string | null>(null)
   const [connStatus, setConnStatus] = useState('connecting')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [whiteName, setWhiteName] = useState<string | null>(null)
@@ -145,7 +144,7 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!id) return
-    const es = new EventSource(SSE_URL)
+    const es = new EventSource(gameStreamUrl(id))
     es.onopen = () => setConnStatus('connected')
     es.onerror = () =>
       setConnStatus(
@@ -155,8 +154,6 @@ export default function GamePage() {
       const event: StreamEvent = JSON.parse(e.data)
 
       if (event.type === 'fen') {
-        liveGameIdRef.current = event.game_id
-        if (event.game_id !== id) return
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
         setMoves(event.moves ?? [])
@@ -168,8 +165,6 @@ export default function GamePage() {
         })
         setGameStatus(event.status)
       } else if (event.type === 'game_start') {
-        liveGameIdRef.current = event.game_id
-        if (event.game_id !== id) return
         setResult(null)
         setWhiteName(event.white_name)
         setBlackName(event.black_name)
@@ -178,7 +173,6 @@ export default function GamePage() {
         setGameStatus('playing')
         setViewPly(null)
       } else if (event.type === 'move') {
-        if (liveGameIdRef.current !== id) return
         setMoves((prev) => [...prev, event.san])
         setClocks({
           white: event.white_clock,
@@ -186,7 +180,6 @@ export default function GamePage() {
           updatedAt: Date.now(),
         })
       } else if (event.type === 'game_end') {
-        if (liveGameIdRef.current !== id) return
         setResult(event.result)
         setGameStatus('ended')
       }

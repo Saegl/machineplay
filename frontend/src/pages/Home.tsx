@@ -1,13 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Chessground } from '../Chessground'
-import {
-  API_URL,
-  SSE_URL,
-  type Engine,
-  type Game,
-  type StreamEvent,
-} from '../api'
+import { API_URL, type Engine, type Game, type Runner } from '../api'
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime()
@@ -79,13 +73,14 @@ function RecentGameRow({ game }: { game: Game }) {
 export default function Home() {
   const navigate = useNavigate()
   const [engines, setEngines] = useState<Engine[]>([])
+  const [runners, setRunners] = useState<Runner[]>([])
   const [whiteId, setWhiteId] = useState('')
   const [blackId, setBlackId] = useState('')
+  const [runnerId, setRunnerId] = useState('')
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const [games, setGames] = useState<Game[] | null>(null)
   const [gamesError, setGamesError] = useState<string | null>(null)
-  const liveGameIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/engine`)
@@ -98,6 +93,16 @@ export default function Home() {
         }
       })
       .catch(() => setStartError('failed to load engines'))
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_URL}/runners`)
+      .then((r) => r.json())
+      .then((data: Runner[]) => {
+        setRunners(data)
+        if (data.length > 0) setRunnerId(data[0].runner_id)
+      })
+      .catch(() => setStartError('failed to load runners'))
   }, [])
 
   useEffect(() => {
@@ -115,86 +120,8 @@ export default function Home() {
     }
   }, [])
 
-  useEffect(() => {
-    const es = new EventSource(SSE_URL)
-    es.onmessage = (e) => {
-      const event: StreamEvent = JSON.parse(e.data)
-
-      if (event.type === 'fen') {
-        liveGameIdRef.current = event.game_id
-        if (!event.game_id || event.status === 'idle') return
-        const gameId = event.game_id
-        setGames((prev) => {
-          if (!prev) return prev
-          const idx = prev.findIndex((g) => g.id === gameId)
-          if (idx < 0) return prev
-          const next = [...prev]
-          next[idx] = {
-            ...prev[idx],
-            fen: event.fen,
-            moves: event.moves,
-            status: event.status === 'ended' ? 'ended' : 'playing',
-            result: event.result,
-            white_clock: event.white_clock,
-            black_clock: event.black_clock,
-          }
-          return next
-        })
-      } else if (event.type === 'game_start') {
-        liveGameIdRef.current = event.game_id
-        if (!event.game_id) return
-        const newId = event.game_id
-        fetch(`${API_URL}/game/${newId}`)
-          .then((r) => (r.ok ? (r.json() as Promise<Game>) : null))
-          .then((g) => {
-            if (!g) return
-            setGames((prev) => {
-              if (!prev) return [g]
-              if (prev.some((x) => x.id === g.id)) return prev
-              return [g, ...prev]
-            })
-          })
-          .catch(() => {})
-      } else if (event.type === 'move') {
-        const gameId = liveGameIdRef.current
-        if (!gameId) return
-        setGames((prev) => {
-          if (!prev) return prev
-          const idx = prev.findIndex((g) => g.id === gameId)
-          if (idx < 0) return prev
-          const next = [...prev]
-          next[idx] = {
-            ...prev[idx],
-            fen: event.fen,
-            moves: [...prev[idx].moves, event.san],
-            white_clock: event.white_clock,
-            black_clock: event.black_clock,
-          }
-          return next
-        })
-      } else if (event.type === 'game_end') {
-        const gameId = liveGameIdRef.current
-        if (!gameId) return
-        setGames((prev) => {
-          if (!prev) return prev
-          const idx = prev.findIndex((g) => g.id === gameId)
-          if (idx < 0) return prev
-          const next = [...prev]
-          next[idx] = {
-            ...prev[idx],
-            status: 'ended',
-            result: event.result,
-            ended_at: new Date().toISOString(),
-          }
-          return next
-        })
-      }
-    }
-    return () => es.close()
-  }, [])
-
   const startGame = async () => {
-    if (!whiteId || !blackId) return
+    if (!whiteId || !blackId || !runnerId) return
     setStarting(true)
     setStartError(null)
     try {
@@ -204,6 +131,7 @@ export default function Home() {
         body: JSON.stringify({
           white_engine_id: whiteId,
           black_engine_id: blackId,
+          runner_id: runnerId,
         }),
       })
       if (!r.ok) {
@@ -258,9 +186,34 @@ export default function Home() {
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-2">
+            <span className="text-neutral-400 w-12">runner</span>
+            <select
+              className="bg-neutral-900 border border-neutral-800 rounded px-2 py-1 flex-1"
+              value={runnerId}
+              onChange={(e) => setRunnerId(e.target.value)}
+              disabled={runners.length === 0}
+            >
+              {runners.length === 0 ? (
+                <option value="">no runners connected</option>
+              ) : (
+                runners.map((r) => (
+                  <option key={r.runner_id} value={r.runner_id}>
+                    {r.name}
+                  </option>
+                ))
+              )}
+            </select>
+          </label>
           <button
             onClick={startGame}
-            disabled={starting || engines.length === 0 || !whiteId || !blackId}
+            disabled={
+              starting ||
+              engines.length === 0 ||
+              !whiteId ||
+              !blackId ||
+              !runnerId
+            }
             className="bg-neutral-100 text-neutral-900 rounded px-3 py-1 disabled:opacity-40"
           >
             {starting ? 'starting…' : 'start game'}

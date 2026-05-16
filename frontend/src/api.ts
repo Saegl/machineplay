@@ -1,5 +1,6 @@
 export const API_URL = import.meta.env.VITE_API_URL as string
-export const SSE_URL = `${API_URL}/sse/stream`
+export const gameStreamUrl = (gameId: string): string =>
+  `${API_URL}/stream/game/${gameId}`
 
 export const START_FEN =
   'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
@@ -9,6 +10,11 @@ export type Engine = {
   name: string
   command: string
   description: string
+}
+
+export type Runner = {
+  runner_id: string
+  name: string
 }
 
 export type GameStatus = 'playing' | 'ended'

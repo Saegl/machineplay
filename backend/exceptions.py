@@ -1,0 +1,19 @@
+from typing import Any
+
+
+class AppException(Exception):
+    status_code = 400
+    code = "app_error"
+    message = "Application Error"
+
+    def __init__(
+        self, message: str | None = None, details: dict[str, Any] | None = None
+    ):
+        self.message = message or self.message
+        self.details = details or {}
+
+
+class NotFoundError(AppException):
+    status_code = 404
+    code = "not_found"
+    message = "Resource not found"

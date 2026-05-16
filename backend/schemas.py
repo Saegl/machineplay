@@ -1,15 +1,15 @@
 from datetime import datetime
-from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-from enums import GameStatus, StreamStatus
+from enums import GameStatus
 
 
 class StartGameRequest(BaseModel):
     white_engine_id: UUID
     black_engine_id: UUID
+    runner_id: UUID
 
 
 class StartGameResponse(BaseModel):
@@ -17,6 +17,13 @@ class StartGameResponse(BaseModel):
     status: str
     white: UUID
     black: UUID
+
+
+class RunnerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    runner_id: UUID
+    name: str
 
 
 class EngineOut(BaseModel):
@@ -45,47 +52,3 @@ class GameOut(BaseModel):
     black_clock: float
     created_at: datetime
     ended_at: datetime | None
-
-
-class FenEvent(BaseModel):
-    type: Literal["fen"] = "fen"
-    fen: str
-    ply: int
-    white_name: str | None
-    black_name: str | None
-    moves: list[str]
-    white_clock: float
-    black_clock: float
-    result: str | None
-    status: StreamStatus
-    game_id: str | None
-
-
-class GameStartEvent(BaseModel):
-    type: Literal["game_start"] = "game_start"
-    white_name: str | None
-    black_name: str | None
-    game_id: str | None
-
-
-class MoveEvent(BaseModel):
-    type: Literal["move"] = "move"
-    uci: str
-    san: str
-    from_square: str
-    to_square: str
-    fen: str
-    ply: int
-    white_clock: float
-    black_clock: float
-
-
-class GameEndEvent(BaseModel):
-    type: Literal["game_end"] = "game_end"
-    result: str | None
-
-
-SSEEvent = Annotated[
-    FenEvent | GameStartEvent | MoveEvent | GameEndEvent,
-    Field(discriminator="type"),
-]

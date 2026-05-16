@@ -2,11 +2,12 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import db
-from game import stream
+from exceptions import AppException
 from routes import router
 
 
@@ -20,20 +21,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     client = await db.connect()
-
     try:
         yield
     finally:
-        logger.info("lifespan `finally` start")
-        if stream._task and not stream._task.done():
-            stream._task.cancel()
+        logger.info("lifespan shutdown")
         await client.close()
-
-        for q in stream.subscribers:
-            q.shutdown()
-
-        stream.subscribers.clear()
-        logger.info("lifespan `finally` end")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -48,5 +40,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(AppException)
+async def app_error_handler(request: Request, exc: AppException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": exc.details,
+            },
+        },
+    )
+
 
 app.include_router(router)
