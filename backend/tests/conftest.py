@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator, Iterator
+from datetime import timezone
 from typing import Any
 
 import pytest
@@ -20,7 +21,9 @@ async def mongo_client(
     mongo_container: MongoDbContainer,
 ) -> AsyncIterator[AsyncMongoClient[dict[str, Any]]]:
     url = mongo_container.get_connection_url()
-    client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(url)
+    client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(
+        url, tz_aware=True, tzinfo=timezone.utc
+    )
     await init_beanie(
         database=client["machineplay_test"], document_models=[Engine, Game]
     )
