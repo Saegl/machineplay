@@ -1,4 +1,5 @@
 import asyncio
+import os
 from uuid import UUID, uuid4
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosedError
@@ -9,6 +10,7 @@ import chess.engine
 import chess.pgn
 
 RUNNER_ID = uuid4()
+BACKEND_URL = os.environ.get("BACKEND_URL", "wss://api.machineplay.org/ws")
 
 
 def parse_tc(spec: str) -> tuple[float, float]:
@@ -131,7 +133,8 @@ class Game:
 
 
 async def connect_backend_ws():
-    async with connect("ws://localhost:8000/ws") as ws:
+    print(f"connecting to {BACKEND_URL}")
+    async with connect(BACKEND_URL) as ws:
         intro = schemas.Introduction(runner_id=RUNNER_ID, name="frostmourne")
         await ws.send(intro.model_dump_json())
 
