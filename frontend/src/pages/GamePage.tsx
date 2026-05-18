@@ -144,6 +144,7 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!id) return
+    if (gameStatus !== 'playing') return
     const es = new EventSource(gameStreamUrl(id))
     es.onopen = () => setConnStatus('connected')
     es.onerror = () =>
@@ -182,10 +183,12 @@ export default function GamePage() {
       } else if (event.type === 'game_end') {
         setResult(event.result)
         setGameStatus('ended')
+        es.close()
+        setConnStatus('disconnected')
       }
     }
     return () => es.close()
-  }, [id])
+  }, [id, gameStatus])
 
   useEffect(() => {
     apiRef.current?.set({

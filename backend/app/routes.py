@@ -162,12 +162,24 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     responses={200: {"model": schemas.GameStreamEvent}},
 )
 async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.GameStreamEvent]:
-    game = streaming.game_registry.get_game(game_id)
+    try:
+        game = streaming.game_registry.get_game(game_id)
+    except NotFoundError:
+        # Game is no longer live; if it exists in the DB, emit a single
+        # terminal event so late subscribers see a clean end rather than 404.
+        doc = await Game.get(game_id)
+        if doc is None:
+            raise
+        yield schemas.GameEndEvent(result=doc.result, pgn=doc.pgn)
+        return
+
     q = game.subscribe()
     try:
         while True:
             event = await q.get()
             yield event
+            if isinstance(event, schemas.GameEndEvent):
+                return
     except asyncio.CancelledError:
         logger.info("SSE cancelled game=%s", game_id)
         raise
