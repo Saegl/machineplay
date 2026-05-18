@@ -13,8 +13,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-
-def parse_tc(spec: str) -> tuple[float, float]:
-    base, _, inc = spec.partition("+")
-    return float(base), float(inc) if inc else 0.0
