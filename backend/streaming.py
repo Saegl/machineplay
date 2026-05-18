@@ -39,7 +39,7 @@ async def abort_orphan_games() -> None:
         logger.info("aborted %d orphan game(s) on startup", len(orphans))
 
 
-async def persist_event(game_id: UUID, event: schemas.SSEEvent) -> None:
+async def persist_event(game_id: UUID, event: schemas.GameStreamEvent) -> None:
     doc = await GameDoc.get(game_id)
     if doc is None:
         logger.warning("event for unknown game_id=%s", game_id)
@@ -73,23 +73,23 @@ async def persist_event(game_id: UUID, event: schemas.SSEEvent) -> None:
 class Game:
     def __init__(self, game_id: UUID):
         self.game_id = game_id
-        self.subscribers: set[asyncio.Queue[schemas.SSEEvent]] = set()
+        self.subscribers: set[asyncio.Queue[schemas.GameStreamEvent]] = set()
 
-    def subscribe(self) -> asyncio.Queue[schemas.SSEEvent]:
-        q: asyncio.Queue[schemas.SSEEvent] = asyncio.Queue(maxsize=256)
+    def subscribe(self) -> asyncio.Queue[schemas.GameStreamEvent]:
+        q: asyncio.Queue[schemas.GameStreamEvent] = asyncio.Queue(maxsize=256)
         self.subscribers.add(q)
         logger.info(
             "game=%s subscriber added, total=%d", self.game_id, len(self.subscribers)
         )
         return q
 
-    def unsubscribe(self, q: asyncio.Queue[schemas.SSEEvent]) -> None:
+    def unsubscribe(self, q: asyncio.Queue[schemas.GameStreamEvent]) -> None:
         self.subscribers.discard(q)
         logger.info(
             "game=%s subscriber removed, total=%d", self.game_id, len(self.subscribers)
         )
 
-    async def broadcast(self, event: schemas.SSEEvent) -> None:
+    async def broadcast(self, event: schemas.GameStreamEvent) -> None:
         for q in self.subscribers:
             try:
                 q.put_nowait(event)
@@ -111,20 +111,26 @@ class LiveStream:
     LIMIT = 8
 
     def __init__(self) -> None:
-        self.subscribers: set[asyncio.Queue[tuple[UUID, schemas.SSEEvent]]] = set()
+        self.subscribers: set[asyncio.Queue[tuple[UUID, schemas.GameStreamEvent]]] = (
+            set()
+        )
         self.tracked: set[UUID] = set()
 
-    def subscribe(self) -> asyncio.Queue[tuple[UUID, schemas.SSEEvent]]:
-        q: asyncio.Queue[tuple[UUID, schemas.SSEEvent]] = asyncio.Queue(maxsize=512)
+    def subscribe(self) -> asyncio.Queue[tuple[UUID, schemas.GameStreamEvent]]:
+        q: asyncio.Queue[tuple[UUID, schemas.GameStreamEvent]] = asyncio.Queue(
+            maxsize=512
+        )
         self.subscribers.add(q)
         logger.info("live stream subscriber added, total=%d", len(self.subscribers))
         return q
 
-    def unsubscribe(self, q: asyncio.Queue[tuple[UUID, schemas.SSEEvent]]) -> None:
+    def unsubscribe(
+        self, q: asyncio.Queue[tuple[UUID, schemas.GameStreamEvent]]
+    ) -> None:
         self.subscribers.discard(q)
         logger.info("live stream subscriber removed, total=%d", len(self.subscribers))
 
-    async def broadcast(self, game_id: UUID, event: schemas.SSEEvent) -> None:
+    async def broadcast(self, game_id: UUID, event: schemas.GameStreamEvent) -> None:
         if game_id in self.tracked:
             self._fanout(game_id, event)
             if isinstance(event, schemas.GameEndEvent):
@@ -165,7 +171,7 @@ class LiveStream:
             )
             return
 
-    def _fanout(self, game_id: UUID, event: schemas.SSEEvent) -> None:
+    def _fanout(self, game_id: UUID, event: schemas.GameStreamEvent) -> None:
         for q in self.subscribers:
             try:
                 q.put_nowait((game_id, event))

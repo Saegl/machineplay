@@ -65,7 +65,7 @@ class Game:
         game.headers["Result"] = self.result or "*"
         return str(game)
 
-    async def send_server(self, event: schemas.SSEEvent):
+    async def send_server(self, event: schemas.GameStreamEvent):
         await self.queue.put(schemas.GameEvent(game_id=self.game_id, event=event))
 
     async def play_game(self):

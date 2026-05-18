@@ -76,7 +76,7 @@ class GameEndEvent(BaseModel):
     pgn: str | None = None
 
 
-SSEEvent = Annotated[
+GameStreamEvent = Annotated[
     FenEvent | GameStartEvent | MoveEvent | GameEndEvent,
     Field(discriminator="type"),
 ]
@@ -92,7 +92,7 @@ class Introduction(BaseModel):
 class GameEvent(BaseModel):
     cmd: Literal["game_event"] = "game_event"
     game_id: UUID
-    event: SSEEvent
+    event: GameStreamEvent
 
 
 type ClientCommandType = Introduction | GameEvent

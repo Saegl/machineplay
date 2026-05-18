@@ -153,7 +153,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
 
 
 @router.get("/stream/game/{game_id}", response_class=EventSourceResponse)
-async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.SSEEvent]:
+async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.GameStreamEvent]:
     game = streaming.game_registry.get_game(game_id)
     q = game.subscribe()
     try:
