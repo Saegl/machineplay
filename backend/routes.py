@@ -152,7 +152,14 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         streaming.runners.unregister_runner(intro.runner_id)
 
 
-@router.get("/stream/game/{game_id}", response_class=EventSourceResponse)
+@router.get(
+    "/stream/game/{game_id}",
+    response_class=EventSourceResponse,
+    # SSE responses are opaque to FastAPI's auto-schema; declaring the
+    # per-message payload here makes the event type appear in OpenAPI so
+    # the generated TS client can reference it.
+    responses={200: {"model": schemas.GameStreamEvent}},
+)
 async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.GameStreamEvent]:
     game = streaming.game_registry.get_game(game_id)
     q = game.subscribe()
@@ -167,7 +174,11 @@ async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.GameStreamEvent]:
         game.unsubscribe(q)
 
 
-@router.get("/stream/live", response_class=EventSourceResponse)
+@router.get(
+    "/stream/live",
+    response_class=EventSourceResponse,
+    responses={200: {"model": LiveStreamEvent}},
+)
 async def sse_live_stream() -> AsyncIterable[LiveStreamEvent]:
     q = streaming.live_stream.subscribe()
     try:

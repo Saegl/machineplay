@@ -11,6 +11,11 @@ coverage-backend:
 run-frontend:
     cd frontend && pnpm dev
 
+# Export the FastAPI OpenAPI schema and regenerate frontend TS types.
+gen-api:
+    cd backend && PYTHONPATH=. uv run python scripts/export_openapi.py
+    cd frontend && pnpm gen-api
+
 run-db:
     mongod --dbpath db/ --bind_ip 127.0.0.1 --port 27017
 

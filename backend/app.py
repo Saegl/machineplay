@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 
 import db
 import streaming
@@ -30,7 +31,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await client.close()
 
 
-app = FastAPI(lifespan=lifespan)
+# Use the route's function name as the OpenAPI operationId so generated
+# clients get readable method names (e.g. `getGame` instead of
+# `get_game_game__game_id__get`).
+def _operation_id(route: APIRoute) -> str:
+    return route.name
+
+
+app = FastAPI(lifespan=lifespan, generate_unique_id_function=_operation_id)
 
 app.add_middleware(
     CORSMiddleware,
