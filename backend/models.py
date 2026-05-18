@@ -7,8 +7,11 @@ from pydantic import Field
 from machineplay.schemas import GameStatus
 
 
-class Engine(Document):
+class UUIDDocument(Document):
     id: UUID = Field(default_factory=uuid4)  # type: ignore[assignment]
+
+
+class Engine(UUIDDocument):
     name: str
     command: str
     description: str = ""
@@ -18,8 +21,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-class Game(Document):
-    id: UUID = Field(default_factory=uuid4)  # type: ignore[assignment]
+class Game(UUIDDocument):
     white_id: UUID
     black_id: UUID
     white_name: str
