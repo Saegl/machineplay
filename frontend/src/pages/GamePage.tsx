@@ -458,17 +458,19 @@ export default function GamePage() {
       </div>
 
       <div className="text-xs text-neutral-500 flex items-center gap-4">
-        <span
-          aria-label={connStatus}
-          title={connStatus}
-          className={`inline-block w-2 h-2 rounded-full ${
-            connStatus === 'connected'
-              ? 'bg-green-500'
-              : connStatus === 'connecting'
-                ? 'bg-amber-400'
-                : 'bg-red-500'
-          }`}
-        />
+        {gameStatus === 'playing' && (
+          <span
+            aria-label={connStatus}
+            title={connStatus}
+            className={`inline-block w-2 h-2 rounded-full ${
+              connStatus === 'connected'
+                ? 'bg-green-500'
+                : connStatus === 'connecting'
+                  ? 'bg-amber-400'
+                  : 'bg-red-500'
+            }`}
+          />
+        )}
         <span>
           move {Math.max(1, Math.ceil(effectiveViewPly / 2))}
           {effectiveViewPly < moves.length ? ` / ${Math.ceil(moves.length / 2)}` : ''}
