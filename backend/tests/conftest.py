@@ -7,7 +7,7 @@ from beanie import init_beanie
 from pymongo import AsyncMongoClient
 from testcontainers.mongodb import MongoDbContainer
 
-from models import Engine, Game
+from app.models import Engine, Game
 
 
 @pytest.fixture(scope="session")

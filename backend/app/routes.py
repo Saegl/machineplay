@@ -6,11 +6,13 @@ from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.sse import EventSourceResponse
 
-from config import settings
-from exceptions import NotFoundError, RunnerBusyError
 from machineplay import schemas
-from models import Engine, Game
-from schemas import (
+
+from app import streaming
+from app.config import settings
+from app.exceptions import NotFoundError, RunnerBusyError
+from app.models import Engine, Game
+from app.schemas import (
     EngineOut,
     GameOut,
     LiveStreamEvent,
@@ -18,7 +20,6 @@ from schemas import (
     StartGameRequest,
     StartGameResponse,
 )
-import streaming
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

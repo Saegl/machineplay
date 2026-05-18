@@ -4,8 +4,8 @@ from typing import Any
 from beanie import init_beanie
 from pymongo import AsyncMongoClient
 
-from config import settings
-from models import Engine, Game
+from app.config import settings
+from app.models import Engine, Game
 
 
 # `dict[str, Any]` is pymongo's _DocumentType — shape of raw BSON results.

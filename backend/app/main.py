@@ -7,10 +7,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 
-import db
-import streaming
-from exceptions import AppException
-from routes import router
+from app import db, streaming
+from app.exceptions import AppException
+from app.routes import router
 
 
 logging.basicConfig(

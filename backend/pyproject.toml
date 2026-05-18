@@ -42,11 +42,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["."]
-omit = [
-    "tests/*",
-    "scripts/*",
-]
+source = ["app"]
 
 [tool.coverage.report]
 show_missing = true

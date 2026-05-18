@@ -1,5 +1,5 @@
 run-backend:
-    cd backend && uv run uvicorn app:app --reload --timeout-graceful-shutdown 0
+    cd backend && uv run uvicorn app.main:app --reload --timeout-graceful-shutdown 0
 
 test-backend:
     cd backend && uv run pytest

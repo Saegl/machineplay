@@ -4,8 +4,8 @@ import pytest
 
 from machineplay import schemas
 from machineplay.schemas import GameStatus
-from models import Game
-from streaming import persist_event
+from app.models import Game
+from app.streaming import persist_event
 
 
 async def _make_game() -> Game:

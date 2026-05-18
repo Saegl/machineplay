@@ -1,7 +1,7 @@
 from httpx import ASGITransport, AsyncClient
 
-from app import app
-from models import Engine
+from app.main import app
+from app.models import Engine
 
 
 async def test_list_engines_empty() -> None:

@@ -8,8 +8,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from beanie import init_beanie
 from pymongo import AsyncMongoClient
 
-from config import settings
-from models import Engine
+from app.config import settings
+from app.models import Engine
 
 
 async def main() -> None:

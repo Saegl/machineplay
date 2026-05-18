@@ -7,7 +7,7 @@ The frontend's `gen-api` script consumes the file to produce TS types.
 import json
 from pathlib import Path
 
-from app import app
+from app.main import app
 
 
 def main() -> None:

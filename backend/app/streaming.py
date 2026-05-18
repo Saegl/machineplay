@@ -4,8 +4,9 @@ from uuid import UUID
 
 from machineplay import schemas
 from machineplay.schemas import GameStatus
-from exceptions import NotFoundError
-from models import Game as GameDoc, utcnow
+
+from app.exceptions import NotFoundError
+from app.models import Game as GameDoc, utcnow
 
 logger = logging.getLogger(__name__)
 
