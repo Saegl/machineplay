@@ -40,34 +40,33 @@ async def abort_orphan_games() -> None:
 
 
 async def persist_event(game_id: UUID, event: schemas.GameStreamEvent) -> None:
-    doc = await GameDoc.get(game_id)
-    if doc is None:
-        logger.warning("event for unknown game_id=%s", game_id)
-        return
-
+    update: dict[str, dict[str, object]] = {}
     match event:
         case schemas.GameStartEvent():
-            doc.status = GameStatus.PLAYING
-            await doc.save()
+            update["$set"] = {"status": GameStatus.PLAYING}
         case schemas.FenEvent(fen=fen, moves=moves, white_clock=wc, black_clock=bc):
-            doc.fen = fen
-            doc.moves = list(moves)
-            doc.white_clock = wc
-            doc.black_clock = bc
-            await doc.save()
+            update["$set"] = {
+                "fen": fen,
+                "moves": list(moves),
+                "white_clock": wc,
+                "black_clock": bc,
+            }
         case schemas.MoveEvent(san=san, fen=fen, white_clock=wc, black_clock=bc):
-            doc.moves = [*doc.moves, san]
-            doc.fen = fen
-            doc.white_clock = wc
-            doc.black_clock = bc
-            await doc.save()
+            update["$push"] = {"moves": san}
+            update["$set"] = {"fen": fen, "white_clock": wc, "black_clock": bc}
         case schemas.GameEndEvent(result=result, pgn=pgn):
-            doc.status = GameStatus.ENDED
-            doc.result = result
-            doc.ended_at = utcnow()
+            set_fields: dict[str, object] = {
+                "status": GameStatus.ENDED,
+                "result": result,
+                "ended_at": utcnow(),
+            }
             if pgn is not None:
-                doc.pgn = pgn
-            await doc.save()
+                set_fields["pgn"] = pgn
+            update["$set"] = set_fields
+
+    result = await GameDoc.find_one(GameDoc.id == game_id).update(update)
+    if result.matched_count == 0:
+        logger.warning("event for unknown game_id=%s", game_id)
 
 
 class Game:
