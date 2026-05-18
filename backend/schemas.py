@@ -3,8 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from enums import GameStatus
-from machineplay.schemas import SSEEvent
+from machineplay.schemas import GameStatus, SSEEvent
 
 
 class StartGameRequest(BaseModel):

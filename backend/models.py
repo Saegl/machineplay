@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from beanie import Document
 from pydantic import Field
 
-from enums import GameStatus
+from machineplay.schemas import GameStatus
 
 
 class Engine(Document):

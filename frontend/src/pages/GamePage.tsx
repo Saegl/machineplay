@@ -7,8 +7,8 @@ import {
   API_URL,
   gameStreamUrl,
   type Game,
+  type GameStatus,
   type StreamEvent,
-  type StreamStatus,
 } from '../api'
 
 type Clocks = { white: number; black: number; updatedAt: number }
@@ -98,7 +98,7 @@ export default function GamePage() {
   const [result, setResult] = useState<string | null>(null)
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const [clocks, setClocks] = useState<Clocks | null>(null)
-  const [gameStatus, setGameStatus] = useState<StreamStatus>('idle')
+  const [gameStatus, setGameStatus] = useState<GameStatus | null>(null)
   const [viewPly, setViewPly] = useState<number | null>(null)
   const [now, setNow] = useState(() => Date.now())
   const moveListRef = useRef<HTMLOListElement | null>(null)
@@ -248,7 +248,7 @@ export default function GamePage() {
   const { byWhite, byBlack } = captured(displayFen)
   const sideToMove: 'white' | 'black' =
     displayFen.split(' ')[1] === 'b' ? 'black' : 'white'
-  const showClocks = gameStatus !== 'idle' && clocks !== null
+  const showClocks = clocks !== null
   const elapsedSinceUpdate = clocks
     ? Math.max(0, (now - clocks.updatedAt) / 1000)
     : 0

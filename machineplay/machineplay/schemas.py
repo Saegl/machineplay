@@ -31,10 +31,10 @@ ServerCommand = Annotated[ServerCommandType, Field(discriminator="cmd")]
 server_adapter = TypeAdapter(ServerCommand)
 
 
-class StreamStatus(StrEnum):
-    IDLE = "idle"
+class GameStatus(StrEnum):
     PLAYING = "playing"
     ENDED = "ended"
+    ABORTED = "aborted"
 
 
 class FenEvent(BaseModel):
@@ -47,7 +47,7 @@ class FenEvent(BaseModel):
     white_clock: float
     black_clock: float
     result: str | None
-    status: StreamStatus
+    status: GameStatus
     game_id: UUID | None
 
 

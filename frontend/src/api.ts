@@ -37,8 +37,6 @@ export type Game = {
   ended_at: string | null
 }
 
-export type StreamStatus = 'idle' | 'playing' | 'ended' | 'aborted'
-
 export type StreamEvent =
   | {
       type: 'fen'
@@ -50,7 +48,7 @@ export type StreamEvent =
       white_clock: number
       black_clock: number
       result: string | null
-      status: StreamStatus
+      status: GameStatus
       game_id: string | null
     }
   | {

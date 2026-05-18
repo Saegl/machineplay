@@ -40,7 +40,7 @@ class Game:
         self.san_moves: list[str] = []
         self.clocks: dict[chess.Color, float] = {chess.WHITE: 0.0, chess.BLACK: 0.0}
         self.result: str | None = None
-        self.status: schemas.StreamStatus = schemas.StreamStatus.IDLE
+        self.status: schemas.GameStatus = schemas.GameStatus.PLAYING
         self.board = chess.Board()
         self.task = asyncio.create_task(self.play_game())
 
@@ -69,8 +69,6 @@ class Game:
         await self.queue.put(schemas.GameEvent(game_id=self.game_id, event=event))
 
     async def play_game(self):
-        self.status = schemas.StreamStatus.PLAYING
-
         base, inc = parse_tc(self.tc)
         self.clocks = {chess.WHITE: base, chess.BLACK: base}
 
@@ -130,7 +128,7 @@ class Game:
             await black.quit()
 
         self.result = self.board.result(claim_draw=True)
-        self.status = schemas.StreamStatus.ENDED
+        self.status = schemas.GameStatus.ENDED
         print(f"game ended result={self.result} plies={self.board.ply()}")
         await self.send_server(
             schemas.GameEndEvent(result=self.result, pgn=self.build_pgn())

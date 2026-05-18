@@ -3,7 +3,7 @@ import logging
 from uuid import UUID
 
 from machineplay import schemas
-from enums import GameStatus
+from machineplay.schemas import GameStatus
 from exceptions import NotFoundError
 from models import Game as GameDoc, utcnow
 
@@ -159,7 +159,7 @@ class LiveStream:
                     white_clock=doc.white_clock,
                     black_clock=doc.black_clock,
                     result=doc.result,
-                    status=schemas.StreamStatus.PLAYING,
+                    status=GameStatus.PLAYING,
                     game_id=gid,
                 ),
             )
