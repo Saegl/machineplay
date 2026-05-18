@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.sse import EventSourceResponse
 
-from config import TC
+from config import settings
 from exceptions import NotFoundError, RunnerBusyError
 from machineplay import schemas
 from models import Engine, Game
@@ -68,7 +68,7 @@ async def start_game(payload: StartGameRequest) -> StartGameResponse:
             game_id=doc.id,
             white=schemas.EngineConfig(name=white.name, command=white.command),
             black=schemas.EngineConfig(name=black.name, command=black.command),
-            tc=TC,
+            tc=settings.tc,
         )
     )
     logger.info("scheduled game=%s on runner=%s", doc.id, runner.runner_id)
