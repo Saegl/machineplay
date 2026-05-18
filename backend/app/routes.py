@@ -175,8 +175,36 @@ async def sse_stream(game_id: UUID) -> AsyncIterable[schemas.GameStreamEvent]:
 
     q = game.subscribe()
     try:
+        # Subscribe-then-snapshot: the WS receiver writes the DB before
+        # broadcasting, so anything already in the snapshot is also (or about
+        # to be) in our queue. Dedup queued events by ply against the snapshot
+        # so the client sees each event exactly once.
+        doc = await Game.get(game_id)
+        snapshot_ply = -1
+        if doc is not None:
+            snapshot_ply = len(doc.moves)
+            yield schemas.FenEvent(
+                fen=doc.fen,
+                ply=snapshot_ply,
+                white_name=doc.white_name,
+                black_name=doc.black_name,
+                moves=doc.moves,
+                white_clock=doc.white_clock,
+                black_clock=doc.black_clock,
+                result=doc.result,
+                status=doc.status,
+                game_id=game_id,
+            )
+
         while True:
             event = await q.get()
+            match event:
+                case schemas.GameStartEvent() if snapshot_ply >= 0:
+                    continue
+                case schemas.MoveEvent(ply=ply) if ply <= snapshot_ply:
+                    continue
+                case schemas.FenEvent(ply=ply) if ply <= snapshot_ply:
+                    continue
             yield event
             if isinstance(event, schemas.GameEndEvent):
                 return
